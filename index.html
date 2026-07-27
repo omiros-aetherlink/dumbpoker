@@ -81,7 +81,7 @@
         .p-bank { font-size: 13px; color: #4caf50; font-weight: bold; }
         .p-bet { font-size: 11px; color: #aaa; margin-top: 1px; }
 
-        /* --- MINI CARDS FOR OPPONENTS --- */
+        /* --- MINI CARDS FOR PLAYERS --- */
         .mini-cards { display: flex; gap: 3px; justify-content: center; margin-top: 4px; }
         .mini-card {
             width: 20px; height: 28px; background: white; border-radius: 3px; font-size: 9px; font-weight: bold;
@@ -154,7 +154,7 @@
             margin-bottom: 5px;
         }
         .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;}
-        .p-balance { font-size: 14px; color: #4caf50; font-weight: bold; margin-bottom: 6px; }
+        .p-balance { font-size: 15px; color: #4caf50; font-weight: bold; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         .hand-container { display: flex; gap: 12px; margin-bottom: 10px; }
 
         .controls { display: flex; flex-direction: column; gap: 8px; width: 100%; align-items: center;}
@@ -182,7 +182,14 @@
         }
         .dice-arena { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 20px 0;}
         .dice-box { text-align: center; }
-        .dice { font-size: 50px; margin: 8px; background: white; width: 75px; height: 75px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: black; box-shadow: 0 0 15px rgba(255,255,255,0.2);}
+        
+        @keyframes spinDice {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .dice { font-size: 32px; font-weight: bold; margin: 8px; background: white; width: 75px; height: 75px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: black; box-shadow: 0 0 15px rgba(255,255,255,0.2);}
+        .dice.rolling { animation: spinDice 0.25s infinite linear; color: #888; }
         .dice-btn { background: var(--gold); color: black; font-size: 20px; padding: 12px 30px;}
 
         @media (max-width: 600px) {
@@ -459,6 +466,10 @@
             renderClientTable();
         } else if (data.type === 'DICE_TRIGGER') {
             triggerDiceOverlay(data.tiedPlayers);
+        } else if (data.type === 'DICE_RESULT') {
+            displayDiceResult(data.rolls, data.resultText);
+        } else if (data.type === 'REFRESH') {
+            location.reload();
         }
     }
 
@@ -466,6 +477,7 @@
         if (!isHost) return;
         el('lobby-screen').style.display = 'none';
         el('table-section').style.display = 'flex';
+        gameState.deck = buildDeck();
         hostNextRound();
     }
 
@@ -481,8 +493,16 @@
 
     function hostNextRound() {
         if (!isHost) return;
+        
+        let requiredCards = gameState.players.length * 2 + 5;
+        if (!gameState.deck || gameState.deck.length < requiredCards) {
+            msg("Deck finished! Refreshing game for everyone...");
+            clientConnections.forEach(conn => conn.send({ type: 'REFRESH' }));
+            setTimeout(() => location.reload(), 1500);
+            return;
+        }
+
         sfx.flip();
-        gameState.deck = buildDeck();
         gameState.pot = 0;
         gameState.state = 0;
         gameState.currentHighestBet = 0;
@@ -695,7 +715,7 @@
             let miniCardsHtml = '';
             if (p.folded) {
                 miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden folded-card"></div><div class="mini-card hidden folded-card"></div></div>`;
-            } else if (gameState.state === 6 && p.cards.length === 2) {
+            } else if ((gameState.state === 6 || p.id === myId) && p.cards.length === 2) {
                 miniCardsHtml = `<div class="mini-cards">
                     <div class="mini-card ${p.cards[0].color}">${p.cards[0].value}</div>
                     <div class="mini-card ${p.cards[1].color}">${p.cards[1].value}</div>
@@ -761,15 +781,17 @@
         tiedPlayers.forEach(p => {
             arena.innerHTML += `<div class="dice-box">
                 <h3 style="color:var(--gold); margin:4px 0;">${p.name}</h3>
-                <div class="dice">🎲</div>
+                <div class="dice rolling" id="dice-${p.id}">?</div>
             </div>`;
         });
         if (isHost) {
             el('btn-roll').style.display = 'block';
+            el('dice-result').innerText = "";
         } else {
             el('btn-roll').style.display = 'none';
             el('dice-result').innerText = "Waiting for Host to roll dice...";
         }
+        el('btn-close-dice').style.display = 'none';
     }
 
     function hostRollDice() {
@@ -777,15 +799,34 @@
         sfx.dice();
         el('btn-roll').style.display = 'none';
         
+        let rolls = {};
         let highest = 0;
         let winners = [];
         window.currentTiedPlayers.forEach(p => {
             let roll = Math.floor(Math.random() * 6) + 1;
+            rolls[p.id] = roll;
             if (roll > highest) { highest = roll; winners = [p]; }
         });
 
         winners[0].bank += gameState.pot;
-        el('dice-result').innerText = `${winners[0].name} SURVIVES AND TAKES THE POT!`;
+        let resultText = `${winners[0].name} rolls a ${rolls[winners[0].id]} and takes the pot!`;
+
+        clientConnections.forEach(conn => {
+            conn.send({ type: 'DICE_RESULT', rolls: rolls, resultText: resultText });
+        });
+
+        displayDiceResult(rolls, resultText);
+    }
+
+    function displayDiceResult(rolls, resultText) {
+        for (let id in rolls) {
+            let diceEl = document.getElementById(`dice-${id}`);
+            if (diceEl) {
+                diceEl.classList.remove('rolling');
+                diceEl.innerText = rolls[id];
+            }
+        }
+        el('dice-result').innerText = resultText;
         el('btn-close-dice').style.display = 'block';
     }
 
