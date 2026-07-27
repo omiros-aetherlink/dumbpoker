@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dumb Poker - Multiplayer</title>
+    <!-- PeerJS for Real-Time Multi-Device Networking -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --felt: #1a432b;
+            --gold: #d4af37;
+            --dark: #111;
+        }
+       @media (max-width: 600px) {
+    body { padding: 10px; }
+    h1 { font-size: 20px; margin-bottom: 5px; }
+    
+    /* Shrink cards slightly on mobile */
+    .card {
+        width: 65px;
+        height: 95px;
+        font-size: 22px;
+    }
+    
+    /* Tighten the community board spacing */
+    .board-container {
+        gap: 15px;
+        padding: 10px 15px;
+        border-radius: 40px;
+    }
+    
+    /* Make controls fit smaller screens */
+    .active-area {
+        padding: 10px;
+    }
+    
+    .screen input {
+        width: 200px;
+        font-size: 16px;
+    }
+}
+ body {
+            background-color: var(--felt);
+            background-image: radial-gradient(circle, #235c3a 0%, #0d2215 100%);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        h1 { margin: 0 0 10px 0; color: var(--gold); text-transform: uppercase; letter-spacing: 3px; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
+        
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 20;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px; box-sizing: border-box; text-align: center;
+        }
+        .screen input, .screen select { font-size: 20px; padding: 10px; margin: 10px; border-radius: 5px; border: 1px solid #444; background: #222; color: white; width: 250px; text-align: center;}
+        .screen button { background: var(--gold); color: black; font-size: 18px; padding: 12px 30px; margin: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase;}
+        .screen button:hover { opacity: 0.9; transform: translateY(-2px); }
+
+        .table-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+            flex-grow: 1;
+            justify-content: space-between;
+            display: none; /* Shown after connection */
+        }
+
+        /* --- PLAYER TRACKER --- */
+        .player-tracker {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .player-badge {
+            background: rgba(0,0,0,0.4);
+            border: 2px solid rgba(255,255,255,0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 90px;
+            transition: 0.3s;
+        }
+        .player-badge.active { border-color: var(--gold); box-shadow: 0 0 15px rgba(212,175,55,0.5); background: rgba(212,175,55,0.1); transform: translateY(-3px);}
+        .player-badge.folded { opacity: 0.3; filter: grayscale(1); }
+        .p-name { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        .p-bank { font-size: 16px; color: #4caf50; font-weight: bold; }
+        .p-bet { font-size: 12px; color: #aaa; margin-top: 3px; }
+
+        /* --- CARDS --- */
+        .board-container {
+            display: flex;
+            gap: 40px; 
+            background: rgba(0,0,0,0.3);
+            padding: 20px 30px;
+            border-radius: 100px;
+            border: 2px solid rgba(212, 175, 55, 0.3);
+            margin: 10px 0;
+        }
+        .card-group { display: flex; gap: 15px; }
+
+        .card {
+            width: 90px;
+            height: 130px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            position: relative;
+            user-select: none;
+        }
+        .card.red { color: #d32f2f; }
+        .card.black { color: #212121; }
+
+        /* Classic Casino Diamond Back */
+        .card.hidden {
+            background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.15) 5px, rgba(0,0,0,0.15) 10px),
+                        repeating-linear-gradient(-45deg, transparent, transparent 5px, rgba(0,0,0,0.15) 5px, rgba(0,0,0,0.15) 10px);
+            background-color: #b71c1c;
+            border: 5px solid white;
+            color: transparent;
+        }
+        .card.hidden span { display: none; }
+
+        /* --- POT & MESSAGES --- */
+        .info-panel { text-align: center; height: 70px; }
+        .pot { font-size: 32px; color: var(--gold); font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .message { font-size: 18px; margin-top: 5px; color: #fff; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; display: inline-block;}
+
+        /* --- ACTIVE PLAYER CONTROLS --- */
+        .active-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0,0,0,0.5);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 10px;
+        }
+        
+        .active-title { font-size: 20px; font-weight: bold; color: var(--gold); margin-bottom: 15px; text-transform: uppercase; }
+
+        .hand-container { display: flex; gap: 15px; margin-bottom: 20px; }
+
+        .controls { display: flex; flex-direction: column; gap: 10px; width: 100%; align-items: center;}
+        .chip-rack { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;}
+
+        button {
+            padding: 12px 20px; font-size: 14px; font-weight: bold; text-transform: uppercase;
+            border: none; border-radius: 6px; cursor: pointer; color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+        }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        .btn-call { background: #1976d2; font-size: 16px; padding: 12px 30px;}
+        .btn-fold { background: #d32f2f; }
+        .btn-loan { background: #ff9800; color: black; font-size: 12px; padding: 6px 12px;}
+        .btn-deal { background: #2e7d32; font-size: 20px; padding: 15px 40px; display: none; margin-top: 10px;}
+
+        .chip { border-radius: 50px; padding: 10px 15px; border: 2px dashed rgba(255,255,255,0.3); font-size: 16px;}
+        .c1 { background: #9e9e9e; color: black;}
+        .c5 { background: #d32f2f; }
+        .c10 { background: #1976d2; }
+        .c20 { background: #388e3c; }
+        .c50 { background: #7b1fa2; }
+
+        /* --- DICE TIEBREAKER --- */
+        .dice-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 10;
+        }
+        .dice-arena { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; margin: 30px 0;}
+        .dice-box { text-align: center; }
+        .dice { font-size: 70px; margin: 10px; background: white; width: 90px; height: 90px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: black; box-shadow: 0 0 20px rgba(255,255,255,0.2);}
+        .dice-btn { background: var(--gold); color: black; font-size: 24px; padding: 15px 40px;}
+    </style>
+</head>
+<body>
+
+    <!-- Setup / Lobby Screen -->
+    <div class="screen" id="setup-screen">
+        <h1 style="font-size: 40px; color: var(--gold);">Dumb Poker</h1>
+        <p style="color: #aaa; margin-bottom: 20px;">True Multi-Device P2P Edition</p>
+        
+        <input type="text" id="player-name-input" placeholder="Your Name" maxlength="12" value="Player 1">
+        
+        <div style="margin-top: 20px;">
+            <button onclick="hostGame()">Host New Game</button>
+            <div style="margin: 15px 0; color: #666;">- OR -</div>
+            <input type="text" id="room-code-input" placeholder="Enter Room Code" style="text-transform: uppercase;" maxlength="4">
+            <br>
+            <button onclick="joinGame()" style="background: #1976d2;">Join Game</button>
+        </div>
+    </div>
+
+    <!-- Waiting Lobby Screen (Host view) -->
+    <div class="screen" id="lobby-screen" style="display: none;">
+        <h1 style="color: var(--gold);">Game Lobby</h1>
+        <p>Room Code: <span id="display-room-code" style="color: var(--gold); font-size: 32px; font-weight: bold; letter-spacing: 3px;">----</span></p>
+        <p style="color: #aaa; font-size: 14px;">Give this code to your friends on their phones.</p>
+        
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; width: 300px; margin: 20px 0;">
+            <h3>Connected Players:</h3>
+            <ul id="lobby-player-list" style="list-style: none; padding: 0; text-align: left; margin: 0;"></ul>
+        </div>
+
+        <button id="host-start-btn" onclick="hostStartGame()" style="display:none; background: #2e7d32;" disabled>Start Game</button>
+    </div>
+
+    <h1>Dumb Poker</h1>
+
+    <div class="table-section" id="table-section">
+        <!-- Player Trackers -->
+        <div class="player-tracker" id="player-tracker"></div>
+
+        <!-- Community Board -->
+        <div class="board-container">
+            <div class="card-group" id="board-group-1"></div>
+            <div class="card-group" id="board-group-2"></div>
+        </div>
+
+        <div class="info-panel">
+            <div class="pot">Pot: $<span id="pot-amount">0</span></div>
+            <div class="message" id="message">Waiting for game to begin...</div>
+        </div>
+
+        <!-- Active Player Controls -->
+        <div class="active-area" id="active-area" style="display:none;">
+            <div class="active-title" id="active-title">Your Turn</div>
+            
+            <div class="hand-container" id="active-hand"></div>
+
+            <div class="controls">
+                <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                    <button class="btn-call" id="btn-call" onclick="sendAction('call')">Pass</button>
+                    <button class="btn-fold" id="btn-fold" onclick="sendAction('fold')">Fold</button>
+                </div>
+                <div class="chip-rack" id="action-rack">
+                    <span style="align-self: center; color: #aaa; margin-right: 5px;">RAISE:</span>
+                    <button class="chip c1" onclick="sendAction('raise', 1)">$1</button>
+                    <button class="chip c5" onclick="sendAction('raise', 5)">$5</button>
+                    <button class="chip c10" onclick="sendAction('raise', 10)">$10</button>
+                    <button class="chip c20" onclick="sendAction('raise', 20)">$20</button>
+                    <button class="chip c50" onclick="sendAction('raise', 50)">$50</button>
+                </div>
+                <button class="btn-loan" onclick="sendAction('loan')" style="margin-top: 10px;">Out of cash? Take Bank Loan (+$100)</button>
+            </div>
+        </div>
+        
+        <button class="btn-deal" id="btn-deal" onclick="hostNextRound()">Deal Next Round</button>
+    </div>
+
+    <!-- Dice Roll Chaos Tiebreaker -->
+    <div class="dice-overlay" id="dice-overlay">
+        <h2 style="color: var(--gold); font-size: 36px; margin-bottom: 0;">SUDDEN DEATH TIE!</h2>
+        <p style="color: white; margin-top: 5px;">Highest roll takes the pot.</p>
+        <div class="dice-arena" id="dice-arena"></div>
+        <button class="dice-btn" id="btn-roll" onclick="hostRollDice()" style="display:none;">ROLL DICE</button>
+        <h2 id="dice-result" style="color: white; font-size: 24px; text-align: center; height: 30px;"></h2>
+        <button id="btn-close-dice" style="display:none; margin-top:20px; background: white; color: black;" onclick="hostCloseDice()">Collect Pot</button>
+    </div>
+
+<script>
+    // --- AUDIO SYNTHESIZER ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration) {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+        osc.stop(audioCtx.currentTime + duration);
+    }
+    const sfx = {
+        flip: () => playTone(300, 'triangle', 0.1),
+        chip: () => { playTone(800, 'sine', 0.05); setTimeout(()=>playTone(1200, 'sine', 0.1), 30); },
+        fold: () => playTone(150, 'sawtooth', 0.3),
+        dice: () => { for(let i=0;i<5;i++) setTimeout(()=>playTone(300+Math.random()*500, 'square', 0.05), i*50); }
+    };
+
+    // --- NETWORK & GAME STATE ---
+    let peer = null;
+    let isHost = false;
+    let myId = null;
+    let myName = "Player 1";
+    let roomCode = "";
+    
+    // Client Connection
+    let hostConnection = null;
+    // Host Connections (Array of client connections)
+    let clientConnections = [];
+
+    // Master Game State (Managed by Host)
+    let gameState = {
+        players: [], // { id, name, bank, cards, folded, currentBet }
+        deck: [],
+        board: [],
+        state: 0, // 0: Pre-flop, 3: Flop, 4: Turn, 5: River, 6: Showdown
+        pot: 0,
+        currentHighestBet: 0,
+        turnIndex: 0
+    };
+
+    const suits = ['♥', '♦', '♣', '♠'];
+    const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    const getRank = (val) => values.indexOf(val);
+
+    const el = (id) => document.getElementById(id);
+    const msg = (text) => el('message').innerText = text;
+
+    // --- SETUP & CONNECTION LOGIC ---
+    function generateCode() {
+        return Math.random().toString(36).substring(2, 6).toUpperCase();
+    }
+
+    function hostGame() {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        myName = el('player-name-input').value.trim() || "Host";
+        roomCode = generateCode();
+        isHost = true;
+        
+        peer = new Peer('dumbpoker-' + roomCode);
+        
+        peer.on('open', (id) => {
+            myId = id;
+            el('setup-screen').style.display = 'none';
+            el('lobby-screen').style.display = 'flex';
+            el('display-room-code').innerText = roomCode;
+            
+            // Host is Player 0
+            gameState.players.push({ id: myId, name: myName, bank: 130, cards: [], folded: false, currentBet: 0 });
+            updateLobbyUI();
+        });
+
+        peer.on('connection', (conn) => {
+            clientConnections.push(conn);
+            conn.on('data', (data) => handleHostIncomingData(data, conn));
+            conn.on('close', () => {
+                gameState.players = gameState.players.filter(p => p.id !== conn.peer);
+                updateLobbyUI();
+                broadcastLobby();
+            });
+        });
+    }
+
+    function joinGame() {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        myName = el('player-name-input').value.trim() || "Guest";
+        roomCode = el('room-code-input').value.trim().toUpperCase();
+        
+        if (!roomCode || roomCode.length !== 4) {
+            alert("Please enter a valid 4-letter room code.");
+            return;
+        }
+
+        isHost = false;
+        peer = new Peer();
+
+        peer.on('open', (id) => {
+            myId = id;
+            hostConnection = peer.connect('dumbpoker-' + roomCode);
+
+            hostConnection.on('open', () => {
+                hostConnection.send({ type: 'JOIN', name: myName, id: myId });
+                el('setup-screen').style.display = 'none';
+                el('lobby-screen').style.display = 'flex';
+                el('display-room-code').innerText = roomCode;
+                el('lobby-screen').querySelector('h3').innerText = "Connected! Waiting for host to start...";
+            });
+
+            hostConnection.on('error', () => {
+                alert("Could not connect to room. Check code.");
+            });
+
+            hostConnection.on('data', (data) => handleClientIncomingData(data));
+        });
+    }
+
+    function updateLobbyUI() {
+        let listHtml = '';
+        gameState.players.forEach(p => {
+            listHtml += `<li style="padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">👤 ${p.name}</li>`;
+        });
+        el('lobby-player-list').innerHTML = listHtml;
+        if (isHost) {
+            let startBtn = el('host-start-btn');
+            startBtn.style.display = 'inline-block';
+            startBtn.disabled = gameState.players.length < 1; // Can test solo or with friends
+        }
+    }
+
+    function broadcastLobby() {
+        let lobbyData = { type: 'LOBBY_UPDATE', players: gameState.players };
+        clientConnections.forEach(conn => conn.send(lobbyData));
+    }
+
+    // --- HOST INCOMING DATA ---
+    function handleHostIncomingData(data, conn) {
+        if (data.type === 'JOIN') {
+            gameState.players.push({ id: data.id, name: data.name, bank: 130, cards: [], folded: false, currentBet: 0 });
+            updateLobbyUI();
+            broadcastLobby();
+        } else if (data.type === 'ACTION') {
+            processPlayerAction(conn.peer, data.action, data.amount);
+        }
+    }
+
+    // --- CLIENT INCOMING DATA ---
+    function handleClientIncomingData(data) {
+        if (data.type === 'LOBBY_UPDATE') {
+            gameState.players = data.players;
+            updateLobbyUI();
+        } else if (data.type === 'GAME_START' || data.type === 'STATE_UPDATE') {
+            el('lobby-screen').style.display = 'none';
+            el('table-section').style.display = 'flex';
+            gameState = data.gameState;
+            renderClientTable();
+        } else if (data.type === 'DICE_TRIGGER') {
+            triggerDiceOverlay(data.tiedPlayers);
+        }
+    }
+
+    // --- HOST GAME CONTROLS ---
+    function hostStartGame() {
+        if (!isHost) return;
+        el('lobby-screen').style.display = 'none';
+        el('table-section').style.display = 'flex';
+        hostNextRound();
+    }
+
+    function buildDeck() {
+        let deck = [];
+        for (let suit of suits) {
+            for (let value of values) {
+                deck.push({ suit, value, rank: getRank(value), color: (suit === '♥' || suit === '♦') ? 'red' : 'black' });
+            }
+        }
+        return deck.sort(() => Math.random() - 0.5);
+    }
+
+    function hostNextRound() {
+        if (!isHost) return;
+        sfx.flip();
+        gameState.deck = buildDeck();
+        gameState.pot = 0;
+        gameState.state = 0;
+        gameState.currentHighestBet = 0;
+        gameState.turnIndex = 0;
+
+        gameState.players.forEach(p => {
+            p.cards = [gameState.deck.pop(), gameState.deck.pop()];
+            p.folded = false;
+            p.currentBet = 0;
+        });
+        gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
+
+        broadcastGameState("Pre-Flop: Pass or Bet to reveal 3 cards.");
+    }
+
+    function processPlayerAction(peerId, action, amount) {
+        let p = gameState.players[gameState.turnIndex];
+        if (p.id !== peerId) return; // Not their turn
+
+        if (action === 'fold') {
+            sfx.fold();
+            p.folded = true;
+            msg(`${p.name} folded.`);
+        } else if (action === 'call') {
+            let callAmount = gameState.currentHighestBet - p.currentBet;
+            if (callAmount > 0) {
+                p.bank -= callAmount;
+                p.currentBet += callAmount;
+                gameState.pot += callAmount;
+                sfx.chip();
+                msg(`${p.name} called $${callAmount}.`);
+            } else {
+                sfx.flip();
+                msg(`${p.name} passed.`);
+            }
+        } else if (action === 'raise') {
+            let callAmount = gameState.currentHighestBet - p.currentBet;
+            let totalCost = callAmount + amount;
+            p.bank -= totalCost;
+            p.currentBet += totalCost;
+            gameState.pot += totalCost;
+            gameState.currentHighestBet = p.currentBet;
+            sfx.chip();
+            msg(`${p.name} raised $${amount}!`);
+        } else if (action === 'loan') {
+            sfx.chip();
+            p.bank += 100;
+            msg(`${p.name} took a $100 loan.`);
+            broadcastGameState(`${p.name} took a loan.`);
+            return; // Doesn't advance turn
+        }
+
+        advanceHostTurn();
+    }
+
+    function advanceHostTurn() {
+        let activePlayers = gameState.players.filter(p => !p.folded);
+        if (activePlayers.length === 1) {
+            activePlayers[0].bank += gameState.pot;
+            endGameHost(`${activePlayers[0].name} wins! Everyone else folded.`);
+            return;
+        }
+
+        let roundOver = activePlayers.every(p => p.currentBet === gameState.currentHighestBet);
+
+        if (roundOver) {
+            advanceHostPhase();
+        } else {
+            do {
+                gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+            } while (gameState.players[gameState.turnIndex].folded);
+            broadcastGameState();
+        }
+    }
+
+    function advanceHostPhase() {
+        gameState.players.forEach(p => p.currentBet = 0);
+        gameState.currentHighestBet = 0;
+        gameState.turnIndex = gameState.players.findIndex(p => !p.folded);
+
+        if (gameState.state === 0) {
+            gameState.state = 3;
+            sfx.flip();
+            msg("Flop revealed.");
+        } else if (gameState.state === 3) {
+            gameState.state = 4;
+            sfx.flip();
+            msg("Turn card revealed.");
+        } else if (gameState.state === 4) {
+            gameState.state = 5;
+            sfx.flip();
+            msg("River! Final betting round.");
+        } else if (gameState.state === 5) {
+            evaluateHostWinner();
+            return;
+        }
+        broadcastGameState();
+    }
+
+    function broadcastGameState(customMsg) {
+        if (customMsg) msg(customMsg);
+        
+        // Send state to all clients
+        clientConnections.forEach(conn => {
+            conn.send({ type: 'STATE_UPDATE', gameState: gameState });
+        });
+        // Render for host locally
+        renderClientTable();
+    }
+
+    function evaluateHostWinner() {
+        gameState.state = 6;
+        sfx.flip();
+        let activePlayers = gameState.players.filter(p => !p.folded);
+
+        activePlayers.forEach(p => {
+            let matches = 0, highestRank = -1;
+            p.cards.forEach(c => {
+                gameState.board.forEach(bc => {
+                    if (c.value === bc.value) {
+                        matches++;
+                        if (c.rank > highestRank) highestRank = c.rank;
+                    }
+                });
+            });
+            p.matches = matches;
+            p.highestRank = highestRank;
+        });
+
+        activePlayers.sort((a, b) => b.matches - a.matches);
+        let topMatch = activePlayers[0].matches;
+        let matchTies = activePlayers.filter(p => p.matches === topMatch);
+
+        if (matchTies.length === 1) {
+            matchTies[0].bank += gameState.pot;
+            endGameHost(`${matchTies[0].name} wins with ${topMatch} matches!`);
+            return;
+        }
+
+        if (topMatch > 0) {
+            matchTies.sort((a, b) => b.highestRank - a.highestRank);
+            let topRank = matchTies[0].highestRank;
+            let rankTies = matchTies.filter(p => p.highestRank === topRank);
+
+            if (rankTies.length === 1) {
+                rankTies[0].bank += gameState.pot;
+                endGameHost(`${rankTies[0].name} wins tiebreaker on High-Card!`);
+                return;
+            }
+            triggerHostDice(rankTies);
+        } else {
+            triggerHostDice(matchTies);
+        }
+    }
+
+    function triggerHostDice(tiedPlayersList) {
+        window.currentTiedPlayers = tiedPlayersList;
+        clientConnections.forEach(conn => {
+            conn.send({ type: 'DICE_TRIGGER', tiedPlayers: tiedPlayersList });
+        });
+        triggerDiceOverlay(tiedPlayersList);
+    }
+
+    function endGameHost(message) {
+        msg(message);
+        gameState.state = 6;
+        broadcastGameState(message);
+        el('btn-deal').style.display = 'block';
+    }
+
+    // --- CLIENT ACTION SENDER ---
+    function sendAction(action, amount = 0) {
+        if (isHost) {
+            processPlayerAction(myId, action, amount);
+        } else {
+            hostConnection.send({ type: 'ACTION', action: action, amount: amount });
+        }
+    }
+
+    // --- RENDER UI (CLIENT & HOST) ---
+    function renderClientTable() {
+        el('pot-amount').innerText = gameState.pot;
+        
+        // Trackers
+        let trackerHtml = '';
+        gameState.players.forEach((p, i) => {
+            let classes = "player-badge";
+            if (p.folded) classes += " folded";
+            else if (i === gameState.turnIndex && gameState.state < 6) classes += " active";
+            let betText = p.currentBet > 0 ? `Bet: $${p.currentBet}` : (p.folded ? 'Folded' : 'Waiting');
+            trackerHtml += `<div class="${classes}">
+                <div class="p-name">${p.name}</div>
+                <div class="p-bank">$${p.bank}</div>
+                <div class="p-bet">${betText}</div>
+            </div>`;
+        });
+        el('player-tracker').innerHTML = trackerHtml;
+
+        // Board
+        let b1 = '', b2 = '';
+        for(let i=0; i<5; i++) {
+            let cardHTML = i < gameState.state ? createCardHTML(gameState.board[i]) : createCardHTML(gameState.board[i], true);
+            if(i < 3) b1 += cardHTML;
+            else b2 += cardHTML;
+        }
+        el('board-group-1').innerHTML = b1;
+        el('board-group-2').innerHTML = b2;
+
+        // Active Player Controls
+        let myTurn = gameState.players[gameState.turnIndex]?.id === myId && gameState.state < 6;
+        let activeArea = el('active-area');
+        
+        if (myTurn) {
+            activeArea.style.display = 'flex';
+            let me = gameState.players.find(p => p.id === myId);
+            el('active-hand').innerHTML = createCardHTML(me.cards[0]) + createCardHTML(me.cards[1]);
+            
+            let callAmount = gameState.currentHighestBet - me.currentBet;
+            el('btn-call').innerText = callAmount === 0 ? "Pass (Check)" : `Call ($${callAmount})`;
+        } else {
+            activeArea.style.display = 'none';
+        }
+
+        if (isHost && gameState.state === 6) {
+            el('btn-deal').style.display = 'block';
+        } else {
+            el('btn-deal').style.display = 'none';
+        }
+    }
+
+    function createCardHTML(card, hidden = false) {
+        if (!card) return '';
+        if (hidden) return `<div class="card hidden"><span></span></div>`;
+        return `<div class="card ${card.color}"><span>${card.value}<br>${card.suit}</span></div>`;
+    }
+
+    // --- DICE OVERLAY ---
+    function triggerDiceOverlay(tiedPlayers) {
+        sfx.dice();
+        el('dice-overlay').style.display = 'flex';
+        let arena = el('dice-arena');
+        arena.innerHTML = '';
+        tiedPlayers.forEach(p => {
+            arena.innerHTML += `<div class="dice-box">
+                <h3 style="color:var(--gold); margin:5px 0;">${p.name}</h3>
+                <div class="dice" id="dice-${p.id}">🎲</div>
+            </div>`;
+        });
+        if (isHost) {
+            el('btn-roll').style.display = 'block';
+        } else {
+            el('btn-roll').style.display = 'none';
+            el('dice-result').innerText = "Waiting for Host to roll dice...";
+        }
+    }
+
+    function hostRollDice() {
+        if (!isHost) return;
+        sfx.dice();
+        el('btn-roll').style.display = 'none';
+        
+        let highest = 0;
+        let winners = [];
+        window.currentTiedPlayers.forEach(p => {
+            let roll = Math.floor(Math.random() * 6) + 1;
+            // Broadcast roll to clients... (Simplified: host rolls and sets winner)
+            if (roll > highest) { highest = roll; winners = [p]; }
+        });
+
+        winners[0].bank += gameState.pot;
+        el('dice-result').innerText = `${winners[0].name} SURVIVES AND TAKES THE POT!`;
+        el('btn-close-dice').style.display = 'block';
+    }
+
+    function hostCloseDice() {
+        el('dice-overlay').style.display = 'none';
+        endGameHost("Chaos concluded.");
+    }
+</script>
+</body>
+</html>
