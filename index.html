@@ -77,12 +77,12 @@
         }
         .player-badge.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); background: rgba(212,175,55,0.1); transform: translateY(-2px);}
         .player-badge.folded { opacity: 0.35; filter: grayscale(1); }
-        .p-name { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
-        .p-bank { font-size: 13px; color: #4caf50; font-weight: bold; }
-        .p-bet { font-size: 11px; color: #aaa; margin-top: 1px; }
+        .p-name { font-weight: bold; font-size: 13px; margin-top: 4px; }
+        .p-bank { font-size: 13px; color: #4caf50; font-weight: bold; margin-bottom: 2px; }
+        .p-bet { font-size: 11px; color: #aaa; margin-bottom: 2px; }
 
-        /* --- MINI CARDS FOR PLAYERS --- */
-        .mini-cards { display: flex; gap: 3px; justify-content: center; margin-top: 4px; }
+        /* --- MINI CARDS FOR OPPONENTS --- */
+        .mini-cards { display: flex; gap: 3px; justify-content: center; margin: 2px 0; }
         .mini-card {
             width: 20px; height: 28px; background: white; border-radius: 3px; font-size: 9px; font-weight: bold;
             display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.4);
@@ -447,6 +447,8 @@
             broadcastLobby();
         } else if (data.type === 'ACTION') {
             processPlayerAction(conn.peer, data.action, data.amount);
+        } else if (data.type === 'CLOSE_DICE_REQUEST') {
+            hostCloseDice();
         }
     }
 
@@ -468,6 +470,8 @@
             triggerDiceOverlay(data.tiedPlayers);
         } else if (data.type === 'DICE_RESULT') {
             displayDiceResult(data.rolls, data.resultText);
+        } else if (data.type === 'CLOSE_DICE') {
+            el('dice-overlay').style.display = 'none';
         } else if (data.type === 'REFRESH') {
             location.reload();
         }
@@ -713,22 +717,24 @@
             let betText = p.currentBet > 0 ? `Bet: $${p.currentBet}` : (p.folded ? 'Folded' : 'Waiting');
             
             let miniCardsHtml = '';
-            if (p.folded) {
-                miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden folded-card"></div><div class="mini-card hidden folded-card"></div></div>`;
-            } else if ((gameState.state === 6 || p.id === myId) && p.cards.length === 2) {
-                miniCardsHtml = `<div class="mini-cards">
-                    <div class="mini-card ${p.cards[0].color}">${p.cards[0].value}</div>
-                    <div class="mini-card ${p.cards[1].color}">${p.cards[1].value}</div>
-                </div>`;
-            } else {
-                miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden"></div><div class="mini-card hidden"></div></div>`;
+            if (p.id !== myId) {
+                if (p.folded) {
+                    miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden folded-card"></div><div class="mini-card hidden folded-card"></div></div>`;
+                } else if (gameState.state === 6 && p.cards.length === 2) {
+                    miniCardsHtml = `<div class="mini-cards">
+                        <div class="mini-card ${p.cards[0].color}">${p.cards[0].value}</div>
+                        <div class="mini-card ${p.cards[1].color}">${p.cards[1].value}</div>
+                    </div>`;
+                } else {
+                    miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden"></div><div class="mini-card hidden"></div></div>`;
+                }
             }
 
             trackerHtml += `<div class="${classes}">
-                <div class="p-name">${p.name}</div>
                 <div class="p-bank">$${p.bank}</div>
                 <div class="p-bet">${betText}</div>
                 ${miniCardsHtml}
+                <div class="p-name">${p.name}</div>
             </div>`;
         });
         el('player-tracker').innerHTML = trackerHtml;
@@ -779,9 +785,10 @@
         let arena = el('dice-arena');
         arena.innerHTML = '';
         tiedPlayers.forEach(p => {
+            let initialNum = Math.floor(Math.random() * 6) + 1;
             arena.innerHTML += `<div class="dice-box">
                 <h3 style="color:var(--gold); margin:4px 0;">${p.name}</h3>
-                <div class="dice rolling" id="dice-${p.id}">?</div>
+                <div class="dice rolling" id="dice-${p.id}">${initialNum}</div>
             </div>`;
         });
         if (isHost) {
@@ -830,7 +837,17 @@
         el('btn-close-dice').style.display = 'block';
     }
 
+    function requestCloseDice() {
+        if (isHost) {
+            hostCloseDice();
+        } else {
+            hostConnection.send({ type: 'CLOSE_DICE_REQUEST' });
+        }
+    }
+
     function hostCloseDice() {
+        if (!isHost) return;
+        clientConnections.forEach(conn => conn.send({ type: 'CLOSE_DICE' }));
         el('dice-overlay').style.display = 'none';
         endGameHost("Chaos concluded.");
     }
