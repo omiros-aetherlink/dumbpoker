@@ -72,14 +72,30 @@
             padding: 6px 12px;
             border-radius: 8px;
             text-align: center;
-            min-width: 80px;
+            min-width: 90px;
             transition: 0.3s;
         }
         .player-badge.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); background: rgba(212,175,55,0.1); transform: translateY(-2px);}
-        .player-badge.folded { opacity: 0.3; filter: grayscale(1); }
-        .p-name { font-weight: bold; font-size: 13px; margin-bottom: 3px; }
-        .p-bank { font-size: 14px; color: #4caf50; font-weight: bold; }
-        .p-bet { font-size: 11px; color: #aaa; margin-top: 2px; }
+        .player-badge.folded { opacity: 0.35; filter: grayscale(1); }
+        .p-name { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
+        .p-bank { font-size: 13px; color: #4caf50; font-weight: bold; }
+        .p-bet { font-size: 11px; color: #aaa; margin-top: 1px; }
+
+        /* --- MINI CARDS FOR OPPONENTS --- */
+        .mini-cards { display: flex; gap: 3px; justify-content: center; margin-top: 4px; }
+        .mini-card {
+            width: 20px; height: 28px; background: white; border-radius: 3px; font-size: 9px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+        .mini-card.red { color: #d32f2f; }
+        .mini-card.black { color: #212121; }
+        .mini-card.hidden {
+            background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+            background-color: #b71c1c;
+            border: 1px solid white;
+            color: transparent;
+        }
+        .mini-card.folded-card { opacity: 0.4; }
 
         /* --- CARDS --- */
         .board-container {
@@ -124,7 +140,7 @@
         .pot { font-size: 26px; color: var(--gold); font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
         .message { font-size: 15px; margin-top: 3px; color: #fff; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 15px; display: inline-block;}
 
-        /* --- PERMANENT POCKET CARDS & CONTROLS --- */
+        /* --- LOCAL PLAYER AREA & BALANCE --- */
         .local-player-area {
             display: flex;
             flex-direction: column;
@@ -137,11 +153,12 @@
             max-width: 500px;
             margin-bottom: 5px;
         }
-        .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;}
+        .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;}
+        .p-balance { font-size: 14px; color: #4caf50; font-weight: bold; margin-bottom: 6px; }
         .hand-container { display: flex; gap: 12px; margin-bottom: 10px; }
 
         .controls { display: flex; flex-direction: column; gap: 8px; width: 100%; align-items: center;}
-        .chip-rack { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;}
+        .chip-rack { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;}
 
         button {
             padding: 10px 16px; font-size: 13px; font-weight: bold; text-transform: uppercase;
@@ -155,12 +172,7 @@
         .btn-loan { background: #ff9800; color: black; font-size: 11px; padding: 5px 10px;}
         .btn-deal { background: #2e7d32; font-size: 16px; padding: 12px 30px; display: none; margin-bottom: 5px;}
 
-        .chip { border-radius: 30px; padding: 8px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 14px;}
-        .c1 { background: #9e9e9e; color: black;}
-        .c5 { background: #d32f2f; }
-        .c10 { background: #1976d2; }
-        .c20 { background: #388e3c; }
-        .c50 { background: #7b1fa2; }
+        .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
 
         /* --- DICE TIEBREAKER --- */
         .dice-overlay {
@@ -225,7 +237,7 @@
     <h1>Dumb Poker</h1>
 
     <div class="table-section" id="table-section">
-        <!-- Player Trackers -->
+        <!-- Player Trackers with Mini Cards -->
         <div class="player-tracker" id="player-tracker"></div>
 
         <!-- Community Board -->
@@ -239,22 +251,23 @@
             <div class="message" id="message">Game starting...</div>
         </div>
 
-        <!-- Permanent Local Pocket Cards & Turn Controls -->
+        <!-- Permanent Local Pocket Cards & Controls -->
         <div class="local-player-area">
             <div class="section-label" id="turn-status-label">Your Pocket Cards</div>
+            <div class="p-balance" id="local-balance">Balance: $130</div>
             <div class="hand-container" id="local-hand"></div>
 
             <div class="controls" id="action-controls" style="display:none;">
                 <div style="display: flex; gap: 10px; margin-bottom: 6px;">
-                    <button class="btn-call" id="btn-call" onclick="sendAction('call')">Pass</button>
+                    <button class="btn-call" id="btn-call" onclick="sendAction('call')">Match</button>
                     <button class="btn-fold" id="btn-fold" onclick="sendAction('fold')">Fold</button>
                 </div>
                 <div class="chip-rack" id="action-rack">
-                    <button class="chip c1" onclick="sendAction('raise', 1)">+$1</button>
-                    <button class="chip c5" onclick="sendAction('raise', 5)">+$5</button>
-                    <button class="chip c10" onclick="sendAction('raise', 10)">+$10</button>
-                    <button class="chip c20" onclick="sendAction('raise', 20)">+$20</button>
-                    <button class="chip c50" onclick="sendAction('raise', 50)">+$50</button>
+                    <button class="chip" onclick="sendAction('raise', 5)">$5</button>
+                    <button class="chip" onclick="sendAction('raise', 10)">$10</button>
+                    <button class="chip" onclick="sendAction('raise', 15)">$15</button>
+                    <button class="chip" onclick="sendAction('raise', 25)">$25</button>
+                    <button class="chip" onclick="sendAction('raise', 50)">$50</button>
                 </div>
             </div>
             <button class="btn-loan" onclick="sendAction('loan')" style="margin-top: 6px;">Take Bank Loan (+$100)</button>
@@ -309,7 +322,8 @@
         pot: 0,
         currentHighestBet: 0,
         turnIndex: 0,
-        theme: "theme-green"
+        theme: "theme-green",
+        message: "Game starting..."
     };
 
     const suits = ['♥', '♦', '♣', '♠'];
@@ -317,7 +331,13 @@
     const getRank = (val) => values.indexOf(val);
 
     const el = (id) => document.getElementById(id);
-    const msg = (text) => el('message').innerText = text;
+    
+    function msg(text) {
+        gameState.message = text;
+        if (el('message')) {
+            el('message').innerText = text;
+        }
+    }
 
     function changeThemeLocally(themeName) {
         currentTheme = themeName;
@@ -346,7 +366,7 @@
             el('host-theme-box').style.display = 'block';
             el('guest-waiting-text').style.display = 'none';
             
-            gameState.players.push({ id: myId, name: myName, bank: 130, cards: [], folded: false, currentBet: 0 });
+            gameState.players.push({ id: myId, name: myName, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false });
             updateLobbyUI();
         });
 
@@ -415,7 +435,7 @@
 
     function handleHostIncomingData(data, conn) {
         if (data.type === 'JOIN') {
-            gameState.players.push({ id: data.id, name: data.name, bank: 130, cards: [], folded: false, currentBet: 0 });
+            gameState.players.push({ id: data.id, name: data.name, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false });
             updateLobbyUI();
             broadcastLobby();
         } else if (data.type === 'ACTION') {
@@ -433,6 +453,9 @@
             el('table-section').style.display = 'flex';
             gameState = data.gameState;
             changeThemeLocally(gameState.theme);
+            if (gameState.message) {
+                el('message').innerText = gameState.message;
+            }
             renderClientTable();
         } else if (data.type === 'DICE_TRIGGER') {
             triggerDiceOverlay(data.tiedPlayers);
@@ -469,6 +492,7 @@
             p.cards = [gameState.deck.pop(), gameState.deck.pop()];
             p.folded = false;
             p.currentBet = 0;
+            p.hasActed = false;
         });
         gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
 
@@ -482,6 +506,7 @@
         if (action === 'fold') {
             sfx.fold();
             p.folded = true;
+            p.hasActed = true;
             msg(`${p.name} folded.`);
         } else if (action === 'call') {
             let callAmount = gameState.currentHighestBet - p.currentBet;
@@ -490,20 +515,32 @@
                 p.currentBet += callAmount;
                 gameState.pot += callAmount;
                 sfx.chip();
-                msg(`${p.name} called $${callAmount}.`);
+                msg(`${p.name} matched $${callAmount}.`);
             } else {
                 sfx.flip();
-                msg(`${p.name} passed.`);
+                msg(`${p.name} checked.`);
             }
+            p.hasActed = true;
         } else if (action === 'raise') {
-            let callAmount = gameState.currentHighestBet - p.currentBet;
-            let totalCost = callAmount + amount;
-            p.bank -= totalCost;
-            p.currentBet += totalCost;
-            gameState.pot += totalCost;
-            gameState.currentHighestBet = p.currentBet;
+            let targetBet = Math.max(amount, gameState.currentHighestBet);
+            let cost = targetBet - p.currentBet;
+            if (cost < 0) cost = 0;
+            
+            p.bank -= cost;
+            p.currentBet = targetBet;
+            gameState.pot += cost;
+            
+            if (targetBet > gameState.currentHighestBet) {
+                gameState.currentHighestBet = targetBet;
+                gameState.players.forEach(other => {
+                    if (other.id !== p.id && !other.folded) {
+                        other.hasActed = false;
+                    }
+                });
+            }
+            p.hasActed = true;
             sfx.chip();
-            msg(`${p.name} raised $${amount}!`);
+            msg(`${p.name} raised to $${targetBet}!`);
         } else if (action === 'loan') {
             sfx.chip();
             p.bank += 100;
@@ -523,7 +560,7 @@
             return;
         }
 
-        let roundOver = activePlayers.every(p => p.currentBet === gameState.currentHighestBet);
+        let roundOver = activePlayers.every(p => p.hasActed && p.currentBet === gameState.currentHighestBet);
 
         if (roundOver) {
             advanceHostPhase();
@@ -536,7 +573,10 @@
     }
 
     function advanceHostPhase() {
-        gameState.players.forEach(p => p.currentBet = 0);
+        gameState.players.forEach(p => {
+            p.currentBet = 0;
+            p.hasActed = false;
+        });
         gameState.currentHighestBet = 0;
         gameState.turnIndex = gameState.players.findIndex(p => !p.folded);
 
@@ -639,16 +679,36 @@
     function renderClientTable() {
         el('pot-amount').innerText = gameState.pot;
         
+        let me = gameState.players.find(p => p.id === myId);
+        if (me) {
+            el('local-balance').innerText = `Balance: $${me.bank}`;
+        }
+
         let trackerHtml = '';
         gameState.players.forEach((p, i) => {
             let classes = "player-badge";
             if (p.folded) classes += " folded";
             else if (i === gameState.turnIndex && gameState.state < 6) classes += " active";
+            
             let betText = p.currentBet > 0 ? `Bet: $${p.currentBet}` : (p.folded ? 'Folded' : 'Waiting');
+            
+            let miniCardsHtml = '';
+            if (p.folded) {
+                miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden folded-card"></div><div class="mini-card hidden folded-card"></div></div>`;
+            } else if (gameState.state === 6 && p.cards.length === 2) {
+                miniCardsHtml = `<div class="mini-cards">
+                    <div class="mini-card ${p.cards[0].color}">${p.cards[0].value}</div>
+                    <div class="mini-card ${p.cards[1].color}">${p.cards[1].value}</div>
+                </div>`;
+            } else {
+                miniCardsHtml = `<div class="mini-cards"><div class="mini-card hidden"></div><div class="mini-card hidden"></div></div>`;
+            }
+
             trackerHtml += `<div class="${classes}">
                 <div class="p-name">${p.name}</div>
                 <div class="p-bank">$${p.bank}</div>
                 <div class="p-bet">${betText}</div>
+                ${miniCardsHtml}
             </div>`;
         });
         el('player-tracker').innerHTML = trackerHtml;
@@ -662,7 +722,6 @@
         el('board-group-1').innerHTML = b1;
         el('board-group-2').innerHTML = b2;
 
-        let me = gameState.players.find(p => p.id === myId);
         if (me && me.cards.length === 2) {
             el('local-hand').innerHTML = createCardHTML(me.cards[0]) + createCardHTML(me.cards[1]);
         }
@@ -675,7 +734,7 @@
             actionControls.style.display = 'flex';
             statusLabel.innerText = "Your Turn to Act!";
             let callAmount = gameState.currentHighestBet - me.currentBet;
-            el('btn-call').innerText = callAmount === 0 ? "Pass (Check)" : `Call ($${callAmount})`;
+            el('btn-call').innerText = callAmount === 0 ? "Pass (Check)" : `Match ($${callAmount})`;
         } else {
             actionControls.style.display = 'none';
             statusLabel.innerText = "Your Pocket Cards";
