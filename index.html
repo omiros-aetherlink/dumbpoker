@@ -21,7 +21,40 @@
         body.theme-crimson { --felt: #4a1c1c; --felt-1: #6d2929; --felt-2: #290e0e; }
         body.theme-teal { --felt: #004d40; --felt-1: #00695c; --felt-2: #00251a; }
         body.theme-orange { --felt: #a83f02; --felt-1: #c94b02; --felt-2: #5e2300; }
-        body.theme-whitewhite { --felt: #ffffff; --felt-1: #e0e6ed; --felt-2: #b0c4de; }
+
+        /* --- WHITE & BLUE THEME OVERRIDES --- */
+        body.theme-whitewhite {
+            --felt: #ffffff;
+            --felt-1: #f4f7f9;
+            --felt-2: #d9e2ec;
+            --gold: #0044cc; /* Override gold to Royal Blue */
+            color: #001f4d; /* Dark navy text */
+        }
+        body.theme-whitewhite h1 { color: var(--gold); text-shadow: none; }
+        body.theme-whitewhite .screen { background: rgba(255, 255, 255, 0.97); color: #001f4d; }
+        body.theme-whitewhite .screen p { color: #0044cc !important; }
+        body.theme-whitewhite .screen input, 
+        body.theme-whitewhite .screen select { background: #ffffff; color: #001f4d; border: 2px solid #0044cc; }
+        body.theme-whitewhite .screen button,
+        body.theme-whitewhite .dice-btn { background: #0044cc; color: white; }
+        body.theme-whitewhite .message { background: #0044cc; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        body.theme-whitewhite .player-badge { background: rgba(255, 255, 255, 0.9); border: 2px solid #a6c1ee; color: #001f4d; }
+        body.theme-whitewhite .player-badge.active { border-color: #0044cc; box-shadow: 0 0 12px rgba(0, 68, 204, 0.4); background: rgba(0, 68, 204, 0.08); }
+        body.theme-whitewhite .p-name { color: #001f4d; }
+        body.theme-whitewhite .p-bank { color: #008800; }
+        body.theme-whitewhite .p-bet { color: #555; }
+        body.theme-whitewhite .board-container { background: rgba(255, 255, 255, 0.7); border: 2px solid #0044cc; box-shadow: 0 4px 15px rgba(0, 68, 204, 0.15); }
+        body.theme-whitewhite .local-player-area { background: rgba(255, 255, 255, 0.9); border: 2px solid #0044cc; color: #001f4d; box-shadow: 0 4px 15px rgba(0, 68, 204, 0.15); }
+        body.theme-whitewhite .section-label { color: #0044cc; }
+        body.theme-whitewhite .pot { color: #0044cc; text-shadow: none; }
+        body.theme-whitewhite .music-btn { background: white; border: 2px solid #0044cc; color: #0044cc; }
+        body.theme-whitewhite .music-btn:hover { background: #0044cc; color: white; }
+        body.theme-whitewhite .dice-overlay { background: rgba(255, 255, 255, 0.95); }
+        body.theme-whitewhite .dice-overlay h2,
+        body.theme-whitewhite .dice-overlay p { color: #0044cc !important; }
+        body.theme-whitewhite .dice-box h3 { color: #0044cc !important; }
+        body.theme-whitewhite #lobby-player-list li { border-bottom: 1px solid rgba(0, 68, 204, 0.2); }
+        /* ------------------------------------ */
 
         body {
             background-color: var(--felt);
@@ -39,61 +72,6 @@
             transition: background 0.5s ease;
         }
 
-        body.theme-whitewhite {
-            color: #111;
-        }
-        body.theme-whitewhite h1 {
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        body.theme-whitewhite .message {
-            color: #111;
-            background: rgba(255,255,255,0.8);
-        }
-        body.theme-whitewhite .player-badge {
-            background: rgba(255,255,255,0.6);
-            border: 2px solid #002366;
-            color: #111;
-        }
-        body.theme-whitewhite .p-bank {
-            color: #0b6623;
-        }
-        body.theme-whitewhite .p-bet {
-            color: #444;
-        }
-        body.theme-whitewhite .board-container {
-            background: rgba(255,255,255,0.5);
-            border: 2px solid #002366;
-        }
-        body.theme-whitewhite .local-player-area {
-            background: rgba(255,255,255,0.6);
-            border: 1px solid #002366;
-            color: #111;
-        }
-        body.theme-whitewhite .p-balance {
-            color: #0b6623;
-        }
-        body.theme-whitewhite .screen {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-        }
-        body.theme-whitewhite .screen input, body.theme-whitewhite .screen select {
-            background: #fff;
-            color: #111;
-            border: 1px solid #002366;
-        }
-        body.theme-whitewhite .dice-overlay {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-        }
-        body.theme-whitewhite .dice-overlay p, body.theme-whitewhite .dice-overlay h2 {
-            color: #111 !important;
-        }
-        body.theme-whitewhite .music-btn {
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #002366;
-            color: #002366;
-        }
-        
         h1 { margin: 15px 0 5px 0; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
         
         /* --- SCREENS --- */
@@ -199,7 +177,6 @@
         /* --- POT & MESSAGES --- */
         .info-panel { text-align: center; height: 55px; }
         .pot { font-size: 26px; color: var(--gold); font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        body.theme-whitewhite .pot { color: #002366; text-shadow: none; }
         .message { font-size: 15px; margin-top: 3px; color: #fff; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 15px; display: inline-block;}
 
         /* --- LOCAL PLAYER AREA & BALANCE --- */
@@ -216,7 +193,6 @@
             margin-bottom: 5px;
         }
         .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;}
-        body.theme-whitewhite .section-label { color: #002366; }
         .p-balance { font-size: 15px; color: #4caf50; font-weight: bold; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         .hand-container { display: flex; gap: 12px; margin-bottom: 10px; }
 
@@ -237,19 +213,9 @@
 
         .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
 
-        /* --- MUSIC CONTROLS (SPLIT TOP LEFT & TOP RIGHT) --- */
-        .mute-control {
-            position: fixed;
-            top: 15px; 
-            left: 15px;
-            z-index: 100;
-        }
-        .track-control {
-            position: fixed;
-            top: 15px; 
-            right: 15px;
-            z-index: 100;
-        }
+        /* --- MUSIC CONTROLS --- */
+        .mute-control { position: fixed; top: 15px; left: 15px; z-index: 100; }
+        .track-control { position: fixed; top: 15px; right: 15px; z-index: 100; }
         .music-btn {
             background: rgba(0,0,0,0.8);
             border: 1px solid var(--gold);
@@ -290,7 +256,7 @@
 </head>
 <body class="theme-green" onclick="initJazzMusic()">
 
-    <!-- Music Controls (Split to Top Left and Top Right) -->
+    <!-- Music Controls -->
     <div class="mute-control">
         <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
     </div>
@@ -298,7 +264,7 @@
         <button class="music-btn" id="track-btn" onclick="event.stopPropagation(); cycleMusicSource()">MS</button>
     </div>
 
-    <!-- Hidden audio elements for local files -->
+    <!-- Hidden audio elements -->
     <audio id="Casablanca" src="ms1.mp3" loop></audio>
     <audio id="Perifida" src="ms2.mp3" loop></audio>
     <audio id="The Hall" src="ms3.mp3" loop></audio>
@@ -306,7 +272,7 @@
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
-        <h1 style="font-size: 34px; color: var(--gold);">Dumb Poker</h1>
+        <h1 style="font-size: 34px;">Dumb Poker</h1>
         <p style="color: #aaa; margin-bottom: 15px;">True Multi-Device P2P Edition</p>
         
         <input type="text" id="player-name-input" placeholder="Your Name" maxlength="12" value="Player 1">
@@ -322,7 +288,7 @@
 
     <!-- Waiting Lobby Screen -->
     <div class="screen" id="lobby-screen" style="display: none;">
-        <h1 style="color: var(--gold);">Game Lobby</h1>
+        <h1>Game Lobby</h1>
         <p>Room Code: <span id="display-room-code" style="color: var(--gold); font-size: 28px; font-weight: bold; letter-spacing: 2px;">----</span></p>
         
         <div id="host-theme-box" style="margin: 10px 0;">
@@ -340,7 +306,7 @@
             </select>
         </div>
 
-        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; width: 280px; margin: 15px 0;">
+        <div style="background: rgba(0,0,0,0.05); padding: 12px; border-radius: 8px; width: 280px; margin: 15px 0; border: 1px solid rgba(128,128,128,0.2);">
             <h3 style="margin-top: 0; font-size: 15px;">Connected Players:</h3>
             <ul id="lobby-player-list" style="list-style: none; padding: 0; text-align: left; margin: 0; font-size: 14px;"></ul>
         </div>
@@ -352,7 +318,7 @@
     <h1>Dumb Poker</h1>
 
     <div class="table-section" id="table-section">
-        <!-- Player Trackers with Mini Cards -->
+        <!-- Player Trackers -->
         <div class="player-tracker" id="player-tracker"></div>
 
         <!-- Community Board -->
@@ -366,7 +332,7 @@
             <div class="message" id="message">Game starting...</div>
         </div>
 
-        <!-- Permanent Local Pocket Cards & Controls -->
+        <!-- Local Area -->
         <div class="local-player-area">
             <div class="section-label" id="turn-status-label">Your Pocket Cards</div>
             <div class="p-balance" id="local-balance">Balance: $130</div>
@@ -391,13 +357,13 @@
         <button class="btn-deal" id="btn-deal" onclick="hostNextRound()">Deal Next Round</button>
     </div>
 
-    <!-- Dice Roll Tiebreaker -->
+    <!-- Dice Roll -->
     <div class="dice-overlay" id="dice-overlay">
-        <h2 style="color: var(--gold); font-size: 32px; margin-bottom: 0;">SUDDEN DEATH TIE!</h2>
-        <p style="color: white; margin-top: 4px;">Highest roll takes the pot.</p>
+        <h2 style="font-size: 32px; margin-bottom: 0;">SUDDEN DEATH TIE!</h2>
+        <p style="margin-top: 4px;">Highest roll takes the pot.</p>
         <div class="dice-arena" id="dice-arena"></div>
         <button class="dice-btn" id="btn-roll" onclick="hostRollDice()" style="display:none;">ROLL DICE</button>
-        <h2 id="dice-result" style="color: white; font-size: 22px; text-align: center; height: 25px;"></h2>
+        <h2 id="dice-result" style="font-size: 22px; text-align: center; height: 25px;"></h2>
         <button id="btn-close-dice" style="display:none; margin-top:15px; background: white; color: black;" onclick="requestCloseDice()">Collect Pot</button>
     </div>
 
@@ -414,7 +380,7 @@
     }
 
     let jazzPlaying = false;
-    let musicMode = 0; // 0: MS, 1: Casablanca, 2: Perifida, 3: The Hall
+    let musicMode = 0; 
     let isMuted = false;
 
     function stopAllAudio() {
@@ -662,7 +628,7 @@
     function updateLobbyUI() {
         let listHtml = '';
         gameState.players.forEach(p => {
-            listHtml += `<li style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">👤 ${p.name}</li>`;
+            listHtml += `<li style="padding: 4px 0;">👤 ${p.name}</li>`;
         });
         el('lobby-player-list').innerHTML = listHtml;
         if (isHost) {
@@ -1020,7 +986,7 @@
         tiedPlayers.forEach(p => {
             let initialNum = Math.floor(Math.random() * 6) + 1;
             arena.innerHTML += `<div class="dice-box">
-                <h3 style="color:var(--gold); margin:4px 0;">${p.name}</h3>
+                <h3 style="margin:4px 0;">${p.name}</h3>
                 <div class="dice rolling" id="dice-${p.id}">${initialNum}</div>
             </div>`;
         });
