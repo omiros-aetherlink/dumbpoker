@@ -174,6 +174,27 @@
 
         .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
 
+        /* --- MUSIC CONTROLS --- */
+        .music-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 6px;
+            z-index: 30;
+        }
+        .music-btn {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 6px 12px;
+            font-size: 11px;
+            border-radius: 20px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .music-btn:hover { background: var(--gold); color: black; }
+
         /* --- DICE TIEBREAKER --- */
         .dice-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -200,6 +221,16 @@
     </style>
 </head>
 <body class="theme-green" onclick="initJazzMusic()">
+
+    <!-- Music Controls Overlay -->
+    <div class="music-controls">
+        <button class="music-btn" onclick="event.stopPropagation(); cycleMusicSource()">Track: Procedural</button>
+        <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
+    </div>
+
+    <!-- Hidden audio elements for local files -->
+    <audio id="audio-ms1" src="ms1.mp3" loop></audio>
+    <audio id="audio-ms2" src="ms2.mp3" loop></audio>
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
@@ -306,73 +337,103 @@
     }
 
     let jazzPlaying = false;
+    let musicMode = 0; // 0: Procedural, 1: ms1.mp3, 2: ms2.mp3
+    let isMuted = false;
+
     function initJazzMusic() {
         if (jazzPlaying) return;
         jazzPlaying = true;
         if(audioCtx.state === 'suspended') audioCtx.resume();
-
-        // Extended procedural background smooth jazz loop generator with multiple song/chord progressions
-        const jazzSongs = [
-            // Song 1: Cmaj7 Smooth Lounge
-            [
-                [261.63, 329.63, 392.00, 493.88],
-                [220.00, 261.63, 329.63, 392.00],
-                [174.61, 220.00, 261.63, 329.63],
-                [196.00, 246.94, 293.66, 349.23]
-            ],
-            // Song 2: Dm7 Upbeat Cafe Bop
-            [
-                [293.66, 349.23, 440.00, 523.25],
-                [246.94, 293.66, 349.23, 440.00],
-                [220.00, 261.63, 329.63, 392.00],
-                [196.00, 246.94, 293.66, 349.23]
-            ],
-            // Song 3: Fmaj7 Midnight Noir
-            [
-                [174.61, 220.00, 261.63, 329.63],
-                [146.83, 185.00, 220.00, 261.63],
-                [130.81, 164.81, 196.00, 246.94],
-                [164.81, 207.65, 246.94, 293.66]
-            ],
-            // Song 4: Bbmaj7 Starlit Swing
-            [
-                [233.08, 293.66, 349.23, 440.00],
-                [207.65, 261.63, 311.13, 392.00],
-                [174.61, 220.00, 261.63, 329.63],
-                [155.56, 196.00, 233.08, 293.66]
-            ]
-        ];
-
-        let currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
-        let chordIndex = 0;
-
-        setInterval(() => {
-            if(audioCtx.state === 'suspended') return;
-            let currentProgression = jazzSongs[currentSongIndex];
-            let chord = currentProgression[chordIndex];
-            
-            chordIndex = (chordIndex + 1) % currentProgression.length;
-            if (chordIndex === 0) {
-                // Switch to a new random song loop after finishing a progression cycle
-                currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
-            }
-
-            chord.forEach((freq, i) => {
-                setTimeout(() => {
-                    let osc = audioCtx.createOscillator();
-                    let gain = audioCtx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 1.8);
-                }, i * 150);
-            });
-        }, 2000);
+        playActiveMusic();
     }
+
+    function cycleMusicSource() {
+        musicMode = (musicMode + 1) % 3;
+        let btnText = "Track: Procedural";
+        if (musicMode === 1) btnText = "Track: ms1.mp3";
+        if (musicMode === 2) btnText = "Track: ms2.mp3";
+        event.target.innerText = btnText;
+        playActiveMusic();
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        let btn = document.getElementById('mute-btn');
+        btn.innerText = isMuted ? "Unmute" : "Mute";
+        playActiveMusic();
+    }
+
+    function playActiveMusic() {
+        let ms1 = document.getElementById('audio-ms1');
+        let ms2 = document.getElementById('audio-ms2');
+        ms1.pause();
+        ms2.pause();
+
+        if (isMuted) return;
+
+        if (musicMode === 1) {
+            ms1.play().catch(e => console.log(e));
+        } else if (musicMode === 2) {
+            ms2.play().catch(e => console.log(e));
+        }
+    }
+
+    // Extended procedural background smooth jazz loop generator with multiple song/chord progressions
+    const jazzSongs = [
+        [
+            [261.63, 329.63, 392.00, 493.88],
+            [220.00, 261.63, 329.63, 392.00],
+            [174.61, 220.00, 261.63, 329.63],
+            [196.00, 246.94, 293.66, 349.23]
+        ],
+        [
+            [293.66, 349.23, 440.00, 523.25],
+            [246.94, 293.66, 349.23, 440.00],
+            [220.00, 261.63, 329.63, 392.00],
+            [196.00, 246.94, 293.66, 349.23]
+        ],
+        [
+            [174.61, 220.00, 261.63, 329.63],
+            [146.83, 185.00, 220.00, 261.63],
+            [130.81, 164.81, 196.00, 246.94],
+            [164.81, 207.65, 246.94, 293.66]
+        ],
+        [
+            [233.08, 293.66, 349.23, 440.00],
+            [207.65, 261.63, 311.13, 392.00],
+            [174.61, 220.00, 261.63, 329.63],
+            [155.56, 196.00, 233.08, 293.66]
+        ]
+    ];
+
+    let currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
+    let chordIndex = 0;
+
+    setInterval(() => {
+        if(audioCtx.state === 'suspended' || musicMode !== 0 || isMuted) return;
+        let currentProgression = jazzSongs[currentSongIndex];
+        let chord = currentProgression[chordIndex];
+        
+        chordIndex = (chordIndex + 1) % currentProgression.length;
+        if (chordIndex === 0) {
+            currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
+        }
+
+        chord.forEach((freq, i) => {
+            setTimeout(() => {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1.8);
+            }, i * 150);
+        });
+    }, 2000);
 
     const sfx = {
         flip: () => playTone(300, 'triangle', 0.1),
@@ -719,7 +780,6 @@
             });
             p.matches = matches;
             p.highestRank = highestRank;
-            // Highest individual card rank in the player's own deck (pocket cards)
             p.maxCardRank = Math.max(p.cards[0].rank, p.cards[1].rank);
         });
 
@@ -928,4 +988,3 @@
 </script>
 </body>
 </html>
-
