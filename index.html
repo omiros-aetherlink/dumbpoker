@@ -22,8 +22,8 @@
         body.theme-teal { --felt: #004d40; --felt-1: #00695c; --felt-2: #00251a; }
         body.theme-orange { --felt: #a83f02; --felt-1: #c94b02; --felt-2: #5e2300; }
         /* THE SURPRISES */
-        body.theme-mystery1 { --felt: #0d47a1; --felt-1: #1976d2; --felt-2: #002171; }
-        body.theme-mystery2 { --felt: #111111; --felt-1: #222222; --felt-2: #050505; }
+        body.theme-mystery1 { --felt: #4a3b0c; --felt-1: #735a12; --felt-2: #261e05; }
+        body.theme-mystery2 { --felt: #420d33; --felt-1: #6e1554; --felt-2: #210419; }
 
         body {
             background-color: var(--felt);
@@ -240,7 +240,7 @@
         <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
     </div>
     <div class="track-control">
-        <button class="music-btn" id="track-btn" onclick="event.stopPropagation(); cycleMusicSource()">Track: MS</button>
+        <button class="music-btn" id="track-btn" onclick="event.stopPropagation(); cycleMusicSource()">MS</button>
     </div>
 
     <!-- Hidden audio elements for local files -->
@@ -281,8 +281,8 @@
                 <option value="theme-crimson">Crimson Red Felt</option>
                 <option value="theme-teal">Tropical Teal Felt</option>
                 <option value="theme-orange">Sunset Orange Felt</option>
-                <option value="theme-mystery1">??? Mystery Theme 1 ???</option>
-                <option value="theme-mystery2">??? Mystery Theme 2 ???</option>
+                <option value="theme-mystery1">Vintage Tobacco Felt</option>
+                <option value="theme-mystery2">Neon Velvet Felt</option>
             </select>
         </div>
 
@@ -400,10 +400,10 @@
 
     function cycleMusicSource() {
         musicMode = (musicMode + 1) % 4;
-        let btnText = "Track: MS";
-        if (musicMode === 1) btnText = "Track: Casablanca";
-        if (musicMode === 2) btnText = "Track: Perifida";
-        if (musicMode === 3) btnText = "Track: The Hall";
+        let btnText = "MS";
+        if (musicMode === 1) btnText = "Casablanca";
+        if (musicMode === 2) btnText = "Perifida";
+        if (musicMode === 3) btnText = "The Hall";
         
         let trackBtn = document.getElementById('track-btn');
         if (trackBtn) trackBtn.innerText = btnText;
@@ -1040,3 +1040,4 @@
 </script>
 </body>
 </html>
+
