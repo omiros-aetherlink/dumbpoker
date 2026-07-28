@@ -192,14 +192,6 @@
         .dice.rolling { animation: spinDice 0.25s infinite linear; color: #888; }
         .dice-btn { background: var(--gold); color: black; font-size: 20px; padding: 12px 30px;}
 
-        /* --- AUDIO MUTE BUTTON --- */
-        .mute-btn {
-            position: absolute; top: 10px; right: 10px; z-index: 100;
-            background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
-            font-size: 20px; box-shadow: none; border-radius: 50%;
-            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0;
-        }
-
         @media (max-width: 600px) {
             .card { width: 60px; height: 90px; font-size: 22px; }
             .board-container { gap: 10px; padding: 8px 12px; }
@@ -207,13 +199,7 @@
         }
     </style>
 </head>
-<body class="theme-green">
-
-    <!-- Background Music -->
-    <audio id="bgm-player" loop>
-        <source src="https://upload.wikimedia.org/wikipedia/commons/b/b4/AcidJazz.ogg" type="audio/ogg">
-    </audio>
-    <button class="mute-btn" id="mute-btn" onclick="toggleMute()">🔊</button>
+<body class="theme-green" onclick="initJazzMusic()">
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
@@ -318,6 +304,44 @@
         osc.start(); gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
         osc.stop(audioCtx.currentTime + duration);
     }
+
+    let jazzPlaying = false;
+    function initJazzMusic() {
+        if (jazzPlaying) return;
+        jazzPlaying = true;
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+
+        // Simple procedural background smooth jazz loop generator
+        const chordProgression = [
+            [261.63, 329.63, 392.00, 493.88], // Cmaj7
+            [220.00, 261.63, 329.63, 392.00], // Am7
+            [174.61, 220.00, 261.63, 329.63], // Fmaj7
+            [196.00, 246.94, 293.66, 349.23]  // G7
+        ];
+        let chordIndex = 0;
+
+        setInterval(() => {
+            if(audioCtx.state === 'suspended') return;
+            let chord = chordProgression[chordIndex];
+            chordIndex = (chordIndex + 1) % chordProgression.length;
+
+            chord.forEach((freq, i) => {
+                setTimeout(() => {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 1.8);
+                }, i * 150);
+            });
+        }, 2000);
+    }
+
     const sfx = {
         flip: () => playTone(300, 'triangle', 0.1),
         chip: () => { playTone(800, 'sine', 0.05); setTimeout(()=>playTone(1200, 'sine', 0.1), 30); },
@@ -360,21 +384,6 @@
         }
     }
 
-    /* --- AUDIO CONTROLS --- */
-    let isMuted = false;
-    function toggleMute() {
-        let bgm = el('bgm-player');
-        isMuted = !isMuted;
-        bgm.muted = isMuted;
-        el('mute-btn').innerText = isMuted ? "🔇" : "🔊";
-    }
-
-    function startMusic() {
-        let bgm = el('bgm-player');
-        bgm.volume = 0.2;
-        bgm.play().catch(e => console.log("Audio autoplay prevented by browser"));
-    }
-
     function changeThemeLocally(themeName) {
         currentTheme = themeName;
         document.body.className = themeName;
@@ -388,7 +397,6 @@
 
     function hostGame() {
         if(audioCtx.state === 'suspended') audioCtx.resume();
-        startMusic();
         myName = el('player-name-input').value.trim() || "Host";
         roomCode = generateCode();
         isHost = true;
@@ -420,7 +428,6 @@
 
     function joinGame() {
         if(audioCtx.state === 'suspended') audioCtx.resume();
-        startMusic();
         myName = el('player-name-input').value.trim() || "Guest";
         roomCode = el('room-code-input').value.trim().toUpperCase();
         
@@ -669,69 +676,40 @@
         let activePlayers = gameState.players.filter(p => !p.folded);
 
         activePlayers.forEach(p => {
-            let matches = 0, highestMatchedRank = -1;
-            let pocketHighestRank = Math.max(p.cards[0].rank, p.cards[1].rank); // Check Kicker (Card Superiority)
-            
+            let matches = 0, highestRank = -1;
             p.cards.forEach(c => {
                 gameState.board.forEach(bc => {
                     if (c.value === bc.value) {
                         matches++;
-                        if (c.rank > highestMatchedRank) highestMatchedRank = c.rank;
+                        if (c.rank > highestRank) highestRank = c.rank;
                     }
                 });
             });
             p.matches = matches;
-            p.highestMatchedRank = highestMatchedRank;
-            p.pocketHighestRank = pocketHighestRank;
+            p.highestRank = highestRank;
+            // Also compute absolute hand card strength sum for tiebreaking or superior high card comparison
+            p.cardSum = p.cards.reduce((sum, card) => sum + card.rank, 0);
         });
 
-        // 1. Sort by Highest Number of Matches
-        activePlayers.sort((a, b) => b.matches - a.matches);
+        activePlayers.sort((a, b) => {
+            if (b.matches !== a.matches) return b.matches - a.matches;
+            if (b.highestRank !== a.highestRank) return b.highestRank - a.highestRank;
+            return b.cardSum - a.cardSum;
+        });
+
         let topMatch = activePlayers[0].matches;
-        let matchTies = activePlayers.filter(p => p.matches === topMatch);
+        let topHighestRank = activePlayers[0].highestRank;
+        let topCardSum = activePlayers[0].cardSum;
+
+        let matchTies = activePlayers.filter(p => p.matches === topMatch && p.highestRank === topHighestRank && p.cardSum === topCardSum);
 
         if (matchTies.length === 1) {
             matchTies[0].bank += gameState.pot;
-            endGameHost(`${matchTies[0].name} wins with ${topMatch} matches!`);
+            endGameHost(`${matchTies[0].name} wins with card superiority!`);
             return;
         }
 
-        if (topMatch > 0) {
-            // 2. Sort by Highest Matched Rank 
-            matchTies.sort((a, b) => b.highestMatchedRank - a.highestMatchedRank);
-            let topMatchedRank = matchTies[0].highestMatchedRank;
-            let matchedRankTies = matchTies.filter(p => p.highestMatchedRank === topMatchedRank);
-
-            if (matchedRankTies.length === 1) {
-                matchedRankTies[0].bank += gameState.pot;
-                endGameHost(`${matchedRankTies[0].name} wins tiebreaker on Matched High-Card!`);
-                return;
-            }
-            
-            // 3. Sort by Pocket Card Superiority (Kicker)
-            matchedRankTies.sort((a, b) => b.pocketHighestRank - a.pocketHighestRank);
-            let topPocketRank = matchedRankTies[0].pocketHighestRank;
-            let finalTies = matchedRankTies.filter(p => p.pocketHighestRank === topPocketRank);
-
-            if (finalTies.length === 1) {
-                finalTies[0].bank += gameState.pot;
-                endGameHost(`${finalTies[0].name} wins tiebreaker on Pocket Card Superiority!`);
-                return;
-            }
-            triggerHostDice(finalTies);
-        } else {
-            // No matches at all - Highest Card Evaluation
-            matchTies.sort((a, b) => b.pocketHighestRank - a.pocketHighestRank);
-            let topPocketRank = matchTies[0].pocketHighestRank;
-            let finalTies = matchTies.filter(p => p.pocketHighestRank === topPocketRank);
-
-            if (finalTies.length === 1) {
-                finalTies[0].bank += gameState.pot;
-                endGameHost(`${finalTies[0].name} wins on High-Card!`);
-                return;
-            }
-            triggerHostDice(finalTies);
-        }
+        triggerHostDice(matchTies);
     }
 
     function triggerHostDice(tiedPlayersList) {
@@ -864,23 +842,19 @@
         el('btn-roll').style.display = 'none';
         
         let rolls = {};
+        let usedRolls = new Set();
         let highest = 0;
         let winners = [];
         
-        // Generate Unique Rolls Pool 
-        let availableRolls = [1, 2, 3, 4, 5, 6];
-        while (availableRolls.length < window.currentTiedPlayers.length) {
-             availableRolls.push(availableRolls.length + 1); // Expand if somehow > 6 players tie
-        }
-        availableRolls.sort(() => Math.random() - 0.5); // Shuffle uniqueness pool
-
         window.currentTiedPlayers.forEach(p => {
-            let roll = availableRolls.pop();
+            let roll;
+            do {
+                roll = Math.floor(Math.random() * 6) + 1;
+            } while (usedRolls.has(roll) && usedRolls.size < 6);
+            usedRolls.add(roll);
+
             rolls[p.id] = roll;
-            if (roll > highest) { 
-                highest = roll; 
-                winners = [p]; 
-            }
+            if (roll > highest) { highest = roll; winners = [p]; }
         });
 
         winners[0].bank += gameState.pot;
