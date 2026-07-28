@@ -311,19 +311,51 @@
         jazzPlaying = true;
         if(audioCtx.state === 'suspended') audioCtx.resume();
 
-        // Simple procedural background smooth jazz loop generator
-        const chordProgression = [
-            [261.63, 329.63, 392.00, 493.88], // Cmaj7
-            [220.00, 261.63, 329.63, 392.00], // Am7
-            [174.61, 220.00, 261.63, 329.63], // Fmaj7
-            [196.00, 246.94, 293.66, 349.23]  // G7
+        // Extended procedural background smooth jazz loop generator with multiple song/chord progressions
+        const jazzSongs = [
+            // Song 1: Cmaj7 Smooth Lounge
+            [
+                [261.63, 329.63, 392.00, 493.88],
+                [220.00, 261.63, 329.63, 392.00],
+                [174.61, 220.00, 261.63, 329.63],
+                [196.00, 246.94, 293.66, 349.23]
+            ],
+            // Song 2: Dm7 Upbeat Cafe Bop
+            [
+                [293.66, 349.23, 440.00, 523.25],
+                [246.94, 293.66, 349.23, 440.00],
+                [220.00, 261.63, 329.63, 392.00],
+                [196.00, 246.94, 293.66, 349.23]
+            ],
+            // Song 3: Fmaj7 Midnight Noir
+            [
+                [174.61, 220.00, 261.63, 329.63],
+                [146.83, 185.00, 220.00, 261.63],
+                [130.81, 164.81, 196.00, 246.94],
+                [164.81, 207.65, 246.94, 293.66]
+            ],
+            // Song 4: Bbmaj7 Starlit Swing
+            [
+                [233.08, 293.66, 349.23, 440.00],
+                [207.65, 261.63, 311.13, 392.00],
+                [174.61, 220.00, 261.63, 329.63],
+                [155.56, 196.00, 233.08, 293.66]
+            ]
         ];
+
+        let currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
         let chordIndex = 0;
 
         setInterval(() => {
             if(audioCtx.state === 'suspended') return;
-            let chord = chordProgression[chordIndex];
-            chordIndex = (chordIndex + 1) % chordProgression.length;
+            let currentProgression = jazzSongs[currentSongIndex];
+            let chord = currentProgression[chordIndex];
+            
+            chordIndex = (chordIndex + 1) % currentProgression.length;
+            if (chordIndex === 0) {
+                // Switch to a new random song loop after finishing a progression cycle
+                currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
+            }
 
             chord.forEach((freq, i) => {
                 setTimeout(() => {
@@ -687,21 +719,21 @@
             });
             p.matches = matches;
             p.highestRank = highestRank;
-            // Also compute absolute hand card strength sum for tiebreaking or superior high card comparison
-            p.cardSum = p.cards.reduce((sum, card) => sum + card.rank, 0);
+            // Highest individual card rank in the player's own deck (pocket cards)
+            p.maxCardRank = Math.max(p.cards[0].rank, p.cards[1].rank);
         });
 
         activePlayers.sort((a, b) => {
             if (b.matches !== a.matches) return b.matches - a.matches;
             if (b.highestRank !== a.highestRank) return b.highestRank - a.highestRank;
-            return b.cardSum - a.cardSum;
+            return b.maxCardRank - a.maxCardRank;
         });
 
         let topMatch = activePlayers[0].matches;
         let topHighestRank = activePlayers[0].highestRank;
-        let topCardSum = activePlayers[0].cardSum;
+        let topMaxCardRank = activePlayers[0].maxCardRank;
 
-        let matchTies = activePlayers.filter(p => p.matches === topMatch && p.highestRank === topHighestRank && p.cardSum === topCardSum);
+        let matchTies = activePlayers.filter(p => p.matches === topMatch && p.highestRank === topHighestRank && p.maxCardRank === topMaxCardRank);
 
         if (matchTies.length === 1) {
             matchTies[0].bank += gameState.pot;
@@ -896,3 +928,4 @@
 </script>
 </body>
 </html>
+
