@@ -35,7 +35,8 @@
             box-sizing: border-box;
             transition: background 0.5s ease;
         }
-        h1 { margin: 0 0 5px 0; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
+        
+        h1 { margin: 15px 0 5px 0; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
         
         /* --- SCREENS --- */
         .screen {
@@ -176,24 +177,25 @@
 
         .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
 
-        /* --- MUSIC CONTROLS --- */
+        /* --- MUSIC CONTROLS (MOVED TO BOTTOM RIGHT!) --- */
         .music-controls {
             position: fixed;
-            top: 10px;
-            right: 10px;
+            bottom: 15px; 
+            right: 15px;
             display: flex;
             gap: 6px;
-            z-index: 30;
+            z-index: 100;
         }
         .music-btn {
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.8);
             border: 1px solid var(--gold);
             color: var(--gold);
-            padding: 6px 12px;
-            font-size: 11px;
+            padding: 8px 14px;
+            font-size: 12px;
             border-radius: 20px;
             cursor: pointer;
             text-transform: uppercase;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
         .music-btn:hover { background: var(--gold); color: black; }
 
@@ -346,14 +348,25 @@
     let musicMode = 0; // 0: MS, 1: Casablanca, 2: Perifida, 3: The Hall
     let isMuted = false;
 
+    // BRAND NEW STRICT AUDIO STOPPER to entirely prevent music from overlapping
+    function stopAllAudio() {
+        let casa = document.getElementById('Casablanca');
+        let peri = document.getElementById('Perifida');
+        let hall = document.getElementById('The Hall');
+        let waitingAudio = document.getElementById('audio-waiting');
+        
+        if (casa) { casa.pause(); casa.currentTime = 0; }
+        if (peri) { peri.pause(); peri.currentTime = 0; }
+        if (hall) { hall.pause(); hall.currentTime = 0; }
+        if (waitingAudio) { waitingAudio.pause(); waitingAudio.currentTime = 0; }
+    }
+
     function initJazzMusic() {
         if (jazzPlaying) return;
         jazzPlaying = true;
         if(audioCtx.state === 'suspended') audioCtx.resume();
         if (!isMuted) {
             playActiveMusic();
-            let waitingAudio = document.getElementById('audio-waiting');
-            if (waitingAudio) waitingAudio.play().catch(e => console.log(e));
         }
     }
 
@@ -362,16 +375,8 @@
         let btn = document.getElementById('mute-btn');
         if (btn) btn.innerText = isMuted ? "Unmute" : "Mute";
         
-        let casa = document.getElementById('Casablanca');
-        let peri = document.getElementById('Perifida');
-        let hall = document.getElementById('The Hall');
-        let waitingAudio = document.getElementById('audio-waiting');
-
         if (isMuted) {
-            if (casa) casa.pause();
-            if (peri) peri.pause();
-            if (hall) hall.pause();
-            if (waitingAudio) waitingAudio.pause();
+            stopAllAudio(); // Uses the strict stopper
         } else {
             if (jazzPlaying) {
                 playActiveMusic();
@@ -394,14 +399,14 @@
     }
 
     function playActiveMusic() {
+        // Enforces that ONLY the selected track plays, completely erasing audio overlap
+        stopAllAudio();
+
+        if (isMuted) return;
+
         let casa = document.getElementById('Casablanca');
         let peri = document.getElementById('Perifida');
         let hall = document.getElementById('The Hall');
-        if (casa) casa.pause();
-        if (peri) peri.pause();
-        if (hall) hall.pause();
-
-        if (isMuted) return;
 
         if (musicMode === 1 && casa) {
             casa.play().catch(e => console.log(e));
