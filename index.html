@@ -233,7 +233,7 @@
     <audio id="Casablanca" src="ms1.mp3" loop></audio>
     <audio id="Perifida" src="ms2.mp3" loop></audio>
     <audio id="The Hall" src="ms3.mp3" loop></audio>
-    <audio id="audio-waiting" src="ms1.mp3" loop></audio>
+    <audio id="audio-waiting" src="ms3.mp3" loop></audio>
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
@@ -342,7 +342,7 @@
     }
 
     let jazzPlaying = false;
-    let musicMode = 0; // 0: Procedural, 1: Casablanca, 2: Perifida, 3: The Hall
+    let musicMode = 0; // 0: Procedural, 1: Casablanca, 2: Perifida
 
     function initJazzMusic() {
         if (jazzPlaying) return;
@@ -354,11 +354,10 @@
     }
 
     function cycleMusicSource() {
-        musicMode = (musicMode + 1) % 4;
+        musicMode = (musicMode + 1) % 3;
         let btnText = "Track: Procedural";
         if (musicMode === 1) btnText = "Track: Casablanca";
         if (musicMode === 2) btnText = "Track: Perifida";
-        if (musicMode === 3) btnText = "Track: The Hall";
         event.target.innerText = btnText;
         playActiveMusic();
     }
@@ -367,16 +366,16 @@
         let casa = document.getElementById('Casablanca');
         let peri = document.getElementById('Perifida');
         let hall = document.getElementById('The Hall');
+        let waitingAudio = document.getElementById('audio-waiting');
         casa.pause();
         peri.pause();
         hall.pause();
+        waitingAudio.pause();
 
         if (musicMode === 1) {
             casa.play().catch(e => console.log(e));
         } else if (musicMode === 2) {
             peri.play().catch(e => console.log(e));
-        } else if (musicMode === 3) {
-            hall.play().catch(e => console.log(e));
         }
     }
 
@@ -990,4 +989,3 @@
 </script>
 </body>
 </html>
-
