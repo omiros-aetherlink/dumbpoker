@@ -17,6 +17,8 @@
         body.theme-blue { --felt: #0d2f4f; --felt-1: #1a4a75; --felt-2: #06182c; }
         body.theme-beige { --felt: #8c7355; --felt-1: #a38968; --felt-2: #594732; }
         body.theme-dark { --felt: #1f1f1f; --felt-1: #333333; --felt-2: #0f0f0f; }
+        body.theme-purple { --felt: #3b1c4a; --felt-1: #56296d; --felt-2: #200e29; }
+        body.theme-crimson { --felt: #4a1c1c; --felt-1: #6d2929; --felt-2: #290e0e; }
 
         body {
             background-color: var(--felt);
@@ -225,12 +227,12 @@
     <!-- Music Controls Overlay -->
     <div class="music-controls">
         <button class="music-btn" onclick="event.stopPropagation(); cycleMusicSource()">Track: Procedural</button>
-        <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
     </div>
 
     <!-- Hidden audio elements for local files -->
     <audio id="audio-ms1" src="ms1.mp3" loop></audio>
     <audio id="audio-ms2" src="ms2.mp3" loop></audio>
+    <audio id="audio-waiting" src="ms1.mp3" loop></audio>
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
@@ -260,6 +262,8 @@
                 <option value="theme-blue">Ocean Blue Felt</option>
                 <option value="theme-beige">Beach Beige Felt</option>
                 <option value="theme-dark">Midnight Dark Felt</option>
+                <option value="theme-purple">Royal Purple Felt</option>
+                <option value="theme-crimson">Crimson Red Felt</option>
             </select>
         </div>
 
@@ -337,14 +341,15 @@
     }
 
     let jazzPlaying = false;
-    let musicMode = 0; // 0: Procedural, 1: ms1.mp3, 2: ms2.mp3
-    let isMuted = false;
+    let musicMode = 0; // 0: Procedural (Muted), 1: ms1.mp3, 2: ms2.mp3
 
     function initJazzMusic() {
         if (jazzPlaying) return;
         jazzPlaying = true;
         if(audioCtx.state === 'suspended') audioCtx.resume();
         playActiveMusic();
+        let waitingAudio = document.getElementById('audio-waiting');
+        waitingAudio.play().catch(e => console.log(e));
     }
 
     function cycleMusicSource() {
@@ -356,20 +361,11 @@
         playActiveMusic();
     }
 
-    function toggleMute() {
-        isMuted = !isMuted;
-        let btn = document.getElementById('mute-btn');
-        btn.innerText = isMuted ? "Unmute" : "Mute";
-        playActiveMusic();
-    }
-
     function playActiveMusic() {
         let ms1 = document.getElementById('audio-ms1');
         let ms2 = document.getElementById('audio-ms2');
         ms1.pause();
         ms2.pause();
-
-        if (isMuted) return;
 
         if (musicMode === 1) {
             ms1.play().catch(e => console.log(e));
@@ -410,7 +406,7 @@
     let chordIndex = 0;
 
     setInterval(() => {
-        if(audioCtx.state === 'suspended' || musicMode !== 0 || isMuted) return;
+        if(audioCtx.state === 'suspended' || musicMode !== 0) return;
         let currentProgression = jazzSongs[currentSongIndex];
         let chord = currentProgression[chordIndex];
         
