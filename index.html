@@ -19,6 +19,11 @@
         body.theme-dark { --felt: #1f1f1f; --felt-1: #333333; --felt-2: #0f0f0f; }
         body.theme-purple { --felt: #3b1c4a; --felt-1: #56296d; --felt-2: #200e29; }
         body.theme-crimson { --felt: #4a1c1c; --felt-1: #6d2929; --felt-2: #290e0e; }
+        body.theme-teal { --felt: #004d40; --felt-1: #00695c; --felt-2: #00251a; }
+        body.theme-orange { --felt: #a83f02; --felt-1: #c94b02; --felt-2: #5e2300; }
+        /* THE SURPRISES */
+        body.theme-mystery1 { --felt: #0d47a1; --felt-1: #1976d2; --felt-2: #002171; }
+        body.theme-mystery2 { --felt: #111111; --felt-1: #222222; --felt-2: #050505; }
 
         body {
             background-color: var(--felt);
@@ -177,13 +182,17 @@
 
         .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
 
-        /* --- MUSIC CONTROLS (MOVED TO BOTTOM RIGHT!) --- */
-        .music-controls {
+        /* --- MUSIC CONTROLS (SPLIT TOP LEFT & TOP RIGHT) --- */
+        .mute-control {
             position: fixed;
-            bottom: 15px; 
+            top: 15px; 
+            left: 15px;
+            z-index: 100;
+        }
+        .track-control {
+            position: fixed;
+            top: 15px; 
             right: 15px;
-            display: flex;
-            gap: 6px;
             z-index: 100;
         }
         .music-btn {
@@ -226,9 +235,11 @@
 </head>
 <body class="theme-green" onclick="initJazzMusic()">
 
-    <!-- Music Controls Overlay -->
-    <div class="music-controls">
+    <!-- Music Controls (Split to Top Left and Top Right) -->
+    <div class="mute-control">
         <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
+    </div>
+    <div class="track-control">
         <button class="music-btn" id="track-btn" onclick="event.stopPropagation(); cycleMusicSource()">Track: MS</button>
     </div>
 
@@ -268,6 +279,10 @@
                 <option value="theme-dark">Midnight Dark Felt</option>
                 <option value="theme-purple">Royal Purple Felt</option>
                 <option value="theme-crimson">Crimson Red Felt</option>
+                <option value="theme-teal">Tropical Teal Felt</option>
+                <option value="theme-orange">Sunset Orange Felt</option>
+                <option value="theme-mystery1">??? Mystery Theme 1 ???</option>
+                <option value="theme-mystery2">??? Mystery Theme 2 ???</option>
             </select>
         </div>
 
@@ -348,7 +363,6 @@
     let musicMode = 0; // 0: MS, 1: Casablanca, 2: Perifida, 3: The Hall
     let isMuted = false;
 
-    // BRAND NEW STRICT AUDIO STOPPER to entirely prevent music from overlapping
     function stopAllAudio() {
         let casa = document.getElementById('Casablanca');
         let peri = document.getElementById('Perifida');
@@ -376,7 +390,7 @@
         if (btn) btn.innerText = isMuted ? "Unmute" : "Mute";
         
         if (isMuted) {
-            stopAllAudio(); // Uses the strict stopper
+            stopAllAudio(); 
         } else {
             if (jazzPlaying) {
                 playActiveMusic();
@@ -399,7 +413,6 @@
     }
 
     function playActiveMusic() {
-        // Enforces that ONLY the selected track plays, completely erasing audio overlap
         stopAllAudio();
 
         if (isMuted) return;
@@ -417,7 +430,6 @@
         }
     }
 
-    // Extended background smooth jazz loop generator with multiple song/chord progressions
     const jazzSongs = [
         [
             [261.63, 329.63, 392.00, 493.88],
