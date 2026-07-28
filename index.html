@@ -21,9 +21,7 @@
         body.theme-crimson { --felt: #4a1c1c; --felt-1: #6d2929; --felt-2: #290e0e; }
         body.theme-teal { --felt: #004d40; --felt-1: #00695c; --felt-2: #00251a; }
         body.theme-orange { --felt: #a83f02; --felt-1: #c94b02; --felt-2: #5e2300; }
-        body.theme-mystery1 { --felt: #4a3b0c; --felt-1: #735a12; --felt-2: #261e05; }
-        body.theme-mystery2 { --felt: #420d33; --felt-1: #6e1554; --felt-2: #210419; }
-        body.theme-whitewhite { --felt: #ffffff; --felt-1: #e0e6ed; --felt-2: #b0c4de; }
+        body.theme-rolltide { --felt: #9e1b32; --felt-1: #821025; --felt-2: #540615; }
 
         body {
             background-color: var(--felt);
@@ -41,61 +39,6 @@
             transition: background 0.5s ease;
         }
 
-        body.theme-whitewhite {
-            color: #111;
-        }
-        body.theme-whitewhite h1 {
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        body.theme-whitewhite .message {
-            color: #111;
-            background: rgba(255,255,255,0.8);
-        }
-        body.theme-whitewhite .player-badge {
-            background: rgba(255,255,255,0.6);
-            border: 2px solid #002366;
-            color: #111;
-        }
-        body.theme-whitewhite .p-bank {
-            color: #0b6623;
-        }
-        body.theme-whitewhite .p-bet {
-            color: #444;
-        }
-        body.theme-whitewhite .board-container {
-            background: rgba(255,255,255,0.5);
-            border: 2px solid #002366;
-        }
-        body.theme-whitewhite .local-player-area {
-            background: rgba(255,255,255,0.6);
-            border: 1px solid #002366;
-            color: #111;
-        }
-        body.theme-whitewhite .p-balance {
-            color: #0b6623;
-        }
-        body.theme-whitewhite .screen {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-        }
-        body.theme-whitewhite .screen input, body.theme-whitewhite .screen select {
-            background: #fff;
-            color: #111;
-            border: 1px solid #002366;
-        }
-        body.theme-whitewhite .dice-overlay {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-        }
-        body.theme-whitewhite .dice-overlay p, body.theme-whitewhite .dice-overlay h2 {
-            color: #111 !important;
-        }
-        body.theme-whitewhite .music-btn {
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #002366;
-            color: #002366;
-        }
-        
         h1 { margin: 15px 0 5px 0; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
         
         /* --- SCREENS --- */
@@ -201,7 +144,6 @@
         /* --- POT & MESSAGES --- */
         .info-panel { text-align: center; height: 55px; }
         .pot { font-size: 26px; color: var(--gold); font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        body.theme-whitewhite .pot { color: #002366; text-shadow: none; }
         .message { font-size: 15px; margin-top: 3px; color: #fff; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 15px; display: inline-block;}
 
         /* --- LOCAL PLAYER AREA & BALANCE --- */
@@ -218,7 +160,6 @@
             margin-bottom: 5px;
         }
         .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;}
-        body.theme-whitewhite .section-label { color: #002366; }
         .p-balance { font-size: 15px; color: #4caf50; font-weight: bold; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         .hand-container { display: flex; gap: 12px; margin-bottom: 10px; }
 
@@ -338,9 +279,7 @@
                 <option value="theme-crimson">Crimson Red Felt</option>
                 <option value="theme-teal">Tropical Teal Felt</option>
                 <option value="theme-orange">Sunset Orange Felt</option>
-                <option value="theme-mystery1">Vintage Tobacco Felt</option>
-                <option value="theme-mystery2">Neon Velvet Felt</option>
-                <option value="theme-whitewhite">White with Royal Blue</option>
+                <option value="theme-rolltide">Roll Tide Crimson</option>
             </select>
         </div>
 
