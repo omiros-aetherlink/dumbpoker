@@ -226,14 +226,9 @@
 
     <!-- Music Controls Overlay -->
     <div class="music-controls">
-        <button class="music-btn" onclick="event.stopPropagation(); cycleMusicSource()">Track: Procedural</button>
+        <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
+        <button class="music-btn" onclick="event.stopPropagation(); cycleMusicSource()">Track: The Hall</button>
     </div>
-
-    <!-- Hidden audio elements for local files -->
-    <audio id="Casablanca" src="ms1.mp3" loop></audio>
-    <audio id="Perifida" src="ms2.mp3" loop></audio>
-    <audio id="The Hall" src="ms3.mp3" loop></audio>
-    <audio id="audio-waiting" src="ms3.mp3" loop></audio>
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
@@ -342,99 +337,70 @@
     }
 
     let jazzPlaying = false;
-    let musicMode = 0; // 0: Procedural, 1: Casablanca, 2: Perifida
+    let proceduralInterval = null;
+    let musicMode = 0; // 0: The Hall (MS3), 1: MS3 Alt 1, 2: MS3 Alt 2
+    let isMuted = false;
 
     function initJazzMusic() {
         if (jazzPlaying) return;
         jazzPlaying = true;
         if(audioCtx.state === 'suspended') audioCtx.resume();
-        playActiveMusic();
-        let waitingAudio = document.getElementById('audio-waiting');
-        waitingAudio.play().catch(e => console.log(e));
+        startProceduralMusic();
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        let btn = document.getElementById('mute-btn');
+        if (btn) btn.innerText = isMuted ? "Unmute" : "Mute";
+        if (isMuted) {
+            stopProceduralMusic();
+        } else if (jazzPlaying) {
+            startProceduralMusic();
+        }
     }
 
     function cycleMusicSource() {
         musicMode = (musicMode + 1) % 3;
-        let btnText = "Track: Procedural";
-        if (musicMode === 1) btnText = "Track: Casablanca";
-        if (musicMode === 2) btnText = "Track: Perifida";
-        event.target.innerText = btnText;
-        playActiveMusic();
-    }
-
-    function playActiveMusic() {
-        let casa = document.getElementById('Casablanca');
-        let peri = document.getElementById('Perifida');
-        let hall = document.getElementById('The Hall');
-        let waitingAudio = document.getElementById('audio-waiting');
-        casa.pause();
-        peri.pause();
-        hall.pause();
-        waitingAudio.pause();
-
-        if (musicMode === 1) {
-            casa.play().catch(e => console.log(e));
-        } else if (musicMode === 2) {
-            peri.play().catch(e => console.log(e));
+        let btnText = "Track: The Hall";
+        if (musicMode === 1) btnText = "Track: MS3 Variant 1";
+        if (musicMode === 2) btnText = "Track: MS3 Variant 2";
+        let buttons = document.querySelectorAll('.music-controls .music-btn');
+        if (buttons.length > 1) {
+            buttons[1].innerText = btnText;
+        }
+        if (jazzPlaying && !isMuted) {
+            stopProceduralMusic();
+            startProceduralMusic();
         }
     }
 
-    // Extended procedural background smooth jazz loop generator with multiple song/chord progressions
-    const jazzSongs = [
-        [
-            [261.63, 329.63, 392.00, 493.88],
-            [220.00, 261.63, 329.63, 392.00],
-            [174.61, 220.00, 261.63, 329.63],
-            [196.00, 246.94, 293.66, 349.23]
-        ],
-        [
-            [293.66, 349.23, 440.00, 523.25],
-            [246.94, 293.66, 349.23, 440.00],
-            [220.00, 261.63, 329.63, 392.00],
-            [196.00, 246.94, 293.66, 349.23]
-        ],
-        [
-            [174.61, 220.00, 261.63, 329.63],
-            [146.83, 185.00, 220.00, 261.63],
-            [130.81, 164.81, 196.00, 246.94],
-            [164.81, 207.65, 246.94, 293.66]
-        ],
-        [
-            [233.08, 293.66, 349.23, 440.00],
-            [207.65, 261.63, 311.13, 392.00],
-            [174.61, 220.00, 261.63, 329.63],
-            [155.56, 196.00, 233.08, 293.66]
-        ]
-    ];
-
-    let currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
-    let chordIndex = 0;
-
-    setInterval(() => {
-        if(audioCtx.state === 'suspended' || musicMode !== 0) return;
-        let currentProgression = jazzSongs[currentSongIndex];
-        let chord = currentProgression[chordIndex];
+    function startProceduralMusic() {
+        if (isMuted || proceduralInterval) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         
-        chordIndex = (chordIndex + 1) % currentProgression.length;
-        if (chordIndex === 0) {
-            currentSongIndex = Math.floor(Math.random() * jazzSongs.length);
-        }
+        const scales = [
+            [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25], // The Hall (MS3 Major)
+            [220.00, 246.94, 261.63, 293.66, 329.63, 369.99, 440.00],          // MS3 Minor
+            [196.00, 220.00, 246.94, 293.66, 329.63, 392.00]                   // MS3 Deep
+        ];
+        
+        let currentScale = scales[musicMode];
+        proceduralInterval = setInterval(() => {
+            if (isMuted) return;
+            let note = currentScale[Math.floor(Math.random() * currentScale.length)];
+            playTone(note, musicMode === 0 ? 'sine' : (musicMode === 1 ? 'triangle' : 'sawtooth'), 0.7);
+            if (Math.random() > 0.4) {
+                setTimeout(() => playTone(note * 1.5, 'sine', 0.3), 200);
+            }
+        }, 550);
+    }
 
-        chord.forEach((freq, i) => {
-            setTimeout(() => {
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 1.8);
-            }, i * 150);
-        });
-    }, 2000);
+    function stopProceduralMusic() {
+        if (proceduralInterval) {
+            clearInterval(proceduralInterval);
+            proceduralInterval = null;
+        }
+    }
 
     const sfx = {
         flip: () => playTone(300, 'triangle', 0.1),
