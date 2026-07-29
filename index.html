@@ -1,6 +1,8 @@
-Here is the updated code containing the exact original game with the two new features seamlessly integrated:
- * Disconnection Handler: Gracefully handles when a player drops mid-game by folding their hand, removing them, adjusting the turn queue, and automatically advancing the turn if they were the active player. Clients will also get an alert and reload if the Host disconnects.
- * The "Hatbox" (Emoji Only): A new UI element in the bottom right corner that allows players to send emojis (and only emojis). The input field automatically strips out letters and numbers. Emojis float up from the sender's player badge for everyone to see.
+Here is the corrected code. I have fixed a few critical bugs in the provided implementation that were breaking both the UI and the game logic:
+ * Fatal HTML Parsing Error (Hatbox Regex): The regex in the emoji input field contained an unescaped double quote (") that prematurely closed the oninput HTML attribute, breaking the element entirely. This was replaced with a much cleaner [\x00-\x7F] regex, which strips all ASCII characters (letters, numbers, basic punctuation), leaving only emojis and extended unicode behind without breaking HTML syntax.
+ * Turn-Skipping Disconnect Bug: In the Host's disconnection handler, splicing the active player from the array and then calling advanceHostTurn() caused the turn index to increment twice. This skipped the turn of whoever was next in line. The new logic evaluates round completion locally in the handler without skipping players.
+ * Global Event Deprecation: The event.stopPropagation() calls in the inline HTML for the music buttons relied on the deprecated global window.event. These were updated to explicitly pass the event object onclick="toggleMute(event)".
+Corrected Code
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -298,7 +300,7 @@ Here is the updated code containing the exact original game with the two new fea
             flex-direction: column;
             gap: 8px;
             z-index: 50;
-            display: none; /* hidden until game starts */
+            display: none;
             width: 140px;
         }
         .hatbox-title { color: var(--gold); font-size: 11px; text-transform: uppercase; text-align: center; margin: 0; letter-spacing: 1px;}
@@ -334,12 +336,12 @@ Here is the updated code containing the exact original game with the two new fea
 </head>
 <body class="theme-green" onclick="initJazzMusic()">
 
-    <!-- Music Controls (Split to Top Left and Top Right) -->
+    <!-- Music Controls -->
     <div class="mute-control">
-        <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
+        <button class="music-btn" id="mute-btn" onclick="toggleMute(event)">Mute</button>
     </div>
     <div class="track-control">
-        <button class="music-btn" id="track-btn" onclick="event.stopPropagation(); cycleMusicSource()">MS</button>
+        <button class="music-btn" id="track-btn" onclick="cycleMusicSource(event)">MS</button>
     </div>
 
     <!-- Hidden audio elements for local files -->
@@ -396,7 +398,7 @@ Here is the updated code containing the exact original game with the two new fea
     <h1>Dumb Poker</h1>
 
     <div class="table-section" id="table-section">
-        <!-- Player Trackers with Mini Cards -->
+        <!-- Player Trackers -->
         <div class="player-tracker" id="player-tracker"></div>
 
         <!-- Community Board -->
@@ -457,8 +459,8 @@ Here is the updated code containing the exact original game with the two new fea
             <button class="emoji-btn" onclick="sendEmoji('🤡')">🤡</button>
         </div>
         <div class="emoji-input-row">
-            <!-- Strict Regex to strip alphanumeric characters, leaving mostly emojis -->
-            <input type="text" id="emoji-input" class="emoji-input" placeholder="Drop Emoji..." oninput="this.value = this.value.replace(/[a-zA-Z0-9\s.,!?'"(){}\[\]<>@#$%^&*\-_+=`~|\\/;:]/g, '')">
+            <!-- Fixed Regex: Strips standard ASCII (letters/numbers/punctuation) leaving mostly extended chars/emojis without breaking HTML attribute -->
+            <input type="text" id="emoji-input" class="emoji-input" placeholder="Drop Emoji..." oninput="this.value = this.value.replace(/[\x00-\x7F]/g, '')">
             <button class="hatbox-send-btn" onclick="sendCustomEmoji()">Drop</button>
         </div>
     </div>
@@ -500,7 +502,8 @@ Here is the updated code containing the exact original game with the two new fea
         }
     }
 
-    function toggleMute() {
+    function toggleMute(e) {
+        if(e) e.stopPropagation();
         isMuted = !isMuted;
         let btn = document.getElementById('mute-btn');
         if (btn) btn.innerText = isMuted ? "Unmute" : "Mute";
@@ -514,7 +517,8 @@ Here is the updated code containing the exact original game with the two new fea
         }
     }
 
-    function cycleMusicSource() {
+    function cycleMusicSource(e) {
+        if(e) e.stopPropagation();
         musicMode = (musicMode + 1) % 4;
         let btnText = "MS";
         if (musicMode === 1) btnText = "Casablanca";
@@ -523,7 +527,6 @@ Here is the updated code containing the exact original game with the two new fea
         
         let trackBtn = document.getElementById('track-btn');
         if (trackBtn) trackBtn.innerText = btnText;
-        else if (event && event.target) event.target.innerText = btnText;
 
         playActiveMusic();
     }
@@ -686,11 +689,8 @@ Here is the updated code containing the exact original game with the two new fea
                 if (pIndex !== -1) {
                     let p = gameState.players[pIndex];
                     
-                    // Check if we are currently in an active game
                     if (gameState.state > 0 || el('table-section').style.display === 'flex') {
                         msg(`${p.name} disconnected.`);
-                        p.folded = true; // Fold them instantly so the hand can proceed
-                        
                         let wasTheirTurn = (gameState.turnIndex === pIndex);
                         
                         // Remove them from game state completely
@@ -703,10 +703,26 @@ Here is the updated code containing the exact original game with the two new fea
                             gameState.turnIndex--;
                         }
 
-                        if (wasTheirTurn && gameState.players.length > 0) {
-                            advanceHostTurn();
+                        let activePlayers = gameState.players.filter(pl => !pl.folded);
+                        
+                        if (activePlayers.length === 1) {
+                            activePlayers[0].bank += gameState.pot;
+                            endGameHost(`${activePlayers[0].name} wins! Everyone else folded.`);
+                        } else if (activePlayers.length === 0) {
+                            endGameHost("Everyone folded. House wins!");
                         } else {
-                            broadcastGameState();
+                            let roundOver = activePlayers.every(pl => pl.hasActed && pl.currentBet === gameState.currentHighestBet);
+                            if (roundOver) {
+                                advanceHostPhase();
+                            } else {
+                                if (wasTheirTurn) {
+                                    // Make sure the new active index isn't pointing to a folded player
+                                    while (gameState.players.length > 0 && gameState.players[gameState.turnIndex] && gameState.players[gameState.turnIndex].folded) {
+                                        gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+                                    }
+                                }
+                                broadcastGameState();
+                            }
                         }
                     } else {
                         // Just remove them if we are in the lobby
@@ -1238,7 +1254,6 @@ Here is the updated code containing the exact original game with the two new fea
         floatingEl.className = 'floating-emoji';
         floatingEl.innerText = emojiChar;
 
-        // Try to append it to the sender's player badge to float up from there
         let targetBadge = el(`badge-${senderId}`);
         if (targetBadge) {
             floatingEl.style.top = '0px';
@@ -1251,7 +1266,6 @@ Here is the updated code containing the exact original game with the two new fea
             document.body.appendChild(floatingEl);
         }
 
-        // Cleanup after animation completes
         setTimeout(() => {
             if (floatingEl.parentNode) {
                 floatingEl.parentNode.removeChild(floatingEl);
