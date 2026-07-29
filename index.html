@@ -1,7 +1,6 @@
-Here is the complete updated code. I have preserved everything from your original logic (including the jazz music, dice tiebreaker, themes, and peer logic) and only injected the new features.
-Additions made:
- * Disconnection Handler: If the host drops, clients are alerted and sent back to the start. If a client drops mid-round, the host automatically folds their hand and skips their turn to keep the game moving. If they drop between rounds, they are cleanly removed from the table.
- * Emoji Chatbox: A fixed panel at the bottom right allows players to send emojis. These emojis float up from the respective player's badge on the screen.
+Here is the updated code containing the exact original game with the two new features seamlessly integrated:
+ * Disconnection Handler: Gracefully handles when a player drops mid-game by folding their hand, removing them, adjusting the turn queue, and automatically advancing the turn if they were the active player. Clients will also get an alert and reload if the Host disconnects.
+ * The "Hatbox" (Emoji Only): A new UI element in the bottom right corner that allows players to send emojis (and only emojis). The input field automatically strips out letters and numbers. Emojis float up from the sender's player badge for everyone to see.
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -139,7 +138,7 @@ Additions made:
             text-align: center;
             min-width: 90px;
             transition: 0.3s;
-            position: relative; /* ADDED FOR EMOJI FLOATING */
+            position: relative;
         }
         .player-badge.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); background: rgba(212,175,55,0.1); transform: translateY(-2px);}
         .player-badge.folded { opacity: 0.35; filter: grayscale(1); }
@@ -286,49 +285,50 @@ Additions made:
         .dice.rolling { animation: spinDice 0.25s infinite linear; color: #888; }
         .dice-btn { background: var(--gold); color: black; font-size: 20px; padding: 12px 30px;}
 
-        /* --- EMOJI CHATBOX & FLOATING ANIMATION --- */
-        .emoji-panel {
+        /* --- HATBOX (EMOJI ONLY) --- */
+        .hatbox-container {
             position: fixed;
-            bottom: 15px;
-            right: 15px;
+            bottom: 20px;
+            right: 20px;
             background: rgba(0,0,0,0.7);
-            border: 1px solid var(--gold);
+            border: 2px solid var(--gold);
             border-radius: 12px;
-            padding: 8px;
-            display: none;
-            gap: 5px;
-            z-index: 100;
-            flex-wrap: wrap;
-            max-width: 140px;
-            justify-content: center;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 50;
+            display: none; /* hidden until game starts */
+            width: 140px;
         }
-        .emoji-btn {
-            background: none;
-            border: none;
-            font-size: 22px;
-            cursor: pointer;
-            padding: 4px;
-            box-shadow: none;
-            transition: transform 0.2s;
+        .hatbox-title { color: var(--gold); font-size: 11px; text-transform: uppercase; text-align: center; margin: 0; letter-spacing: 1px;}
+        .emoji-grid { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+        .emoji-btn { background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 5px; font-size: 18px; cursor: pointer; padding: 5px; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;}
+        .emoji-btn:hover { background: rgba(255,255,255,0.3); }
+        .emoji-input-row { display: flex; gap: 5px; }
+        .emoji-input { 
+            flex-grow: 1; width: 10px; background: #222; color: white; border: 1px solid #555; border-radius: 4px; font-size: 14px; text-align: center; padding: 2px;
         }
-        .emoji-btn:hover { transform: scale(1.3); }
-
+        .hatbox-send-btn { background: var(--gold); color: black; padding: 2px 6px; font-size: 10px; min-width: 40px;}
+        
         .floating-emoji {
             position: absolute;
             font-size: 32px;
             pointer-events: none;
-            animation: floatUp 2s ease-out forwards;
-            z-index: 50;
+            animation: floatUp 2.5s ease-out forwards;
+            z-index: 100;
         }
         @keyframes floatUp {
             0% { transform: translate(-50%, 0) scale(1); opacity: 1; }
-            100% { transform: translate(-50%, -60px) scale(1.5); opacity: 0; }
+            100% { transform: translate(-50%, -120px) scale(1.8); opacity: 0; }
         }
 
         @media (max-width: 600px) {
             .card { width: 60px; height: 90px; font-size: 22px; }
             .board-container { gap: 10px; padding: 8px 12px; }
             .local-player-area { padding: 8px 10px; }
+            .hatbox-container { bottom: 5px; right: 5px; padding: 6px; width: 120px; }
+            .emoji-btn { width: 30px; height: 30px; font-size: 14px; }
         }
     </style>
 </head>
@@ -445,16 +445,22 @@ Additions made:
         <button id="btn-close-dice" style="display:none; margin-top:15px; background: white; color: black;" onclick="requestCloseDice()">Collect Pot</button>
     </div>
 
-    <!-- EMOJI PANEL -->
-    <div class="emoji-panel" id="emoji-panel">
-        <button class="emoji-btn" onclick="sendEmoji('😀')">😀</button>
-        <button class="emoji-btn" onclick="sendEmoji('😂')">😂</button>
-        <button class="emoji-btn" onclick="sendEmoji('😎')">😎</button>
-        <button class="emoji-btn" onclick="sendEmoji('😡')">😡</button>
-        <button class="emoji-btn" onclick="sendEmoji('😭')">😭</button>
-        <button class="emoji-btn" onclick="sendEmoji('🤑')">🤑</button>
-        <button class="emoji-btn" onclick="sendEmoji('💩')">💩</button>
-        <button class="emoji-btn" onclick="sendEmoji('🍻')">🍻</button>
+    <!-- Hatbox (Emoji Chat) -->
+    <div class="hatbox-container" id="hatbox-container">
+        <h4 class="hatbox-title">Hatbox</h4>
+        <div class="emoji-grid">
+            <button class="emoji-btn" onclick="sendEmoji('😎')">😎</button>
+            <button class="emoji-btn" onclick="sendEmoji('🤬')">🤬</button>
+            <button class="emoji-btn" onclick="sendEmoji('🤑')">🤑</button>
+            <button class="emoji-btn" onclick="sendEmoji('💀')">💀</button>
+            <button class="emoji-btn" onclick="sendEmoji('🍻')">🍻</button>
+            <button class="emoji-btn" onclick="sendEmoji('🤡')">🤡</button>
+        </div>
+        <div class="emoji-input-row">
+            <!-- Strict Regex to strip alphanumeric characters, leaving mostly emojis -->
+            <input type="text" id="emoji-input" class="emoji-input" placeholder="Drop Emoji..." oninput="this.value = this.value.replace(/[a-zA-Z0-9\s.,!?'"(){}\[\]<>@#$%^&*\-_+=`~|\\/;:]/g, '')">
+            <button class="hatbox-send-btn" onclick="sendCustomEmoji()">Drop</button>
+        </div>
     </div>
 
 <script>
@@ -650,35 +656,6 @@ Additions made:
         return Math.random().toString(36).substring(2, 6).toUpperCase();
     }
 
-    function handleClientDisconnect(peerId) {
-        let playerIndex = gameState.players.findIndex(p => p.id === peerId);
-        if (playerIndex > -1) {
-            let p = gameState.players[playerIndex];
-            msg(`${p.name} disconnected.`);
-            
-            if (gameState.state === 0 || gameState.state === 6) {
-                // Pre-game or end of game, just remove them cleanly
-                gameState.players.splice(playerIndex, 1);
-                updateLobbyUI();
-                broadcastLobby();
-                broadcastGameState();
-            } else {
-                // Mid-game, mark them as folded and disconnected to avoid breaking turn logic
-                p.folded = true;
-                p.hasActed = true;
-                p.disconnected = true;
-                p.name = p.name + " (DC)";
-                
-                if (gameState.turnIndex === playerIndex) {
-                    advanceHostTurn();
-                } else {
-                    broadcastGameState();
-                }
-            }
-        }
-        clientConnections = clientConnections.filter(c => c.peer !== peerId);
-    }
-
     function hostGame() {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         myName = el('player-name-input').value.trim() || "Host";
@@ -702,7 +679,44 @@ Additions made:
         peer.on('connection', (conn) => {
             clientConnections.push(conn);
             conn.on('data', (data) => handleHostIncomingData(data, conn));
-            conn.on('close', () => handleClientDisconnect(conn.peer));
+            
+            // DISCONNECTION HANDLER (HOST SIDE)
+            conn.on('close', () => {
+                let pIndex = gameState.players.findIndex(p => p.id === conn.peer);
+                if (pIndex !== -1) {
+                    let p = gameState.players[pIndex];
+                    
+                    // Check if we are currently in an active game
+                    if (gameState.state > 0 || el('table-section').style.display === 'flex') {
+                        msg(`${p.name} disconnected.`);
+                        p.folded = true; // Fold them instantly so the hand can proceed
+                        
+                        let wasTheirTurn = (gameState.turnIndex === pIndex);
+                        
+                        // Remove them from game state completely
+                        gameState.players.splice(pIndex, 1);
+                        
+                        // Adjust turn index safely
+                        if (gameState.turnIndex >= gameState.players.length) {
+                            gameState.turnIndex = 0;
+                        } else if (pIndex < gameState.turnIndex) {
+                            gameState.turnIndex--;
+                        }
+
+                        if (wasTheirTurn && gameState.players.length > 0) {
+                            advanceHostTurn();
+                        } else {
+                            broadcastGameState();
+                        }
+                    } else {
+                        // Just remove them if we are in the lobby
+                        gameState.players.splice(pIndex, 1);
+                        updateLobbyUI();
+                        broadcastLobby();
+                    }
+                }
+                clientConnections = clientConnections.filter(c => c.peer !== conn.peer);
+            });
         });
     }
 
@@ -738,19 +752,11 @@ Additions made:
 
             hostConnection.on('data', (data) => handleClientIncomingData(data));
             
+            // DISCONNECTION HANDLER (CLIENT SIDE)
             hostConnection.on('close', () => {
-                alert("Host disconnected! Returning to setup...");
+                alert("Disconnected from Host. The game has ended.");
                 location.reload();
             });
-        });
-        
-        peer.on('disconnected', () => {
-            alert("You disconnected from the network.");
-            location.reload();
-        });
-        peer.on('error', () => {
-            alert("Connection error.");
-            location.reload();
         });
     }
 
@@ -782,8 +788,8 @@ Additions made:
         } else if (data.type === 'CLOSE_DICE_REQUEST') {
             hostCloseDice();
         } else if (data.type === 'EMOJI') {
-            broadcastEmoji(data.sender, data.emoji);
-            displayFloatingEmoji(data.sender, data.emoji);
+            // Rebroadcast emoji to all clients and self
+            broadcastEmoji(data.id, data.emoji);
         }
     }
 
@@ -795,7 +801,7 @@ Additions made:
         } else if (data.type === 'GAME_START' || data.type === 'STATE_UPDATE') {
             el('lobby-screen').style.display = 'none';
             el('table-section').style.display = 'flex';
-            el('emoji-panel').style.display = 'flex'; // Show emoji panel in game
+            el('hatbox-container').style.display = 'flex'; // Show Hatbox when game is active
             gameState = data.gameState;
             changeThemeLocally(gameState.theme);
             if (gameState.message) {
@@ -810,36 +816,8 @@ Additions made:
             el('dice-overlay').style.display = 'none';
         } else if (data.type === 'REFRESH') {
             location.reload();
-        } else if (data.type === 'EMOJI') {
-            displayFloatingEmoji(data.sender, data.emoji);
-        }
-    }
-
-    // --- EMOJI LOGIC ---
-    function sendEmoji(emoji) {
-        if (isHost) {
-            broadcastEmoji(myId, emoji);
-            displayFloatingEmoji(myId, emoji);
-        } else if (hostConnection) {
-            hostConnection.send({ type: 'EMOJI', sender: myId, emoji: emoji });
-        }
-    }
-
-    function broadcastEmoji(senderId, emoji) {
-        clientConnections.forEach(conn => conn.send({ type: 'EMOJI', sender: senderId, emoji: emoji }));
-    }
-
-    function displayFloatingEmoji(playerId, emoji) {
-        let badge = document.getElementById(`player-badge-${playerId}`);
-        if (badge) {
-            let el = document.createElement('div');
-            el.className = 'floating-emoji';
-            el.innerText = emoji;
-            // Center it horizontally over the badge
-            el.style.left = '50%';
-            el.style.top = '0';
-            badge.appendChild(el);
-            setTimeout(() => el.remove(), 2000);
+        } else if (data.type === 'SHOW_EMOJI') {
+            showFloatingEmoji(data.senderId, data.emoji);
         }
     }
 
@@ -847,7 +825,7 @@ Additions made:
         if (!isHost) return;
         el('lobby-screen').style.display = 'none';
         el('table-section').style.display = 'flex';
-        el('emoji-panel').style.display = 'flex'; // Show emoji panel in game
+        el('hatbox-container').style.display = 'flex'; // Show Hatbox for Host
         gameState.deck = buildDeck();
         hostNextRound();
     }
@@ -865,9 +843,6 @@ Additions made:
     function hostNextRound() {
         if (!isHost) return;
         
-        // Strip out disconnected players before dealing
-        gameState.players = gameState.players.filter(p => !p.disconnected);
-
         let requiredCards = gameState.players.length * 2 + 5;
         if (!gameState.deck || gameState.deck.length < requiredCards) {
             msg("Deck finished! Refreshing game for everyone...");
@@ -895,7 +870,7 @@ Additions made:
 
     function processPlayerAction(peerId, action, amount) {
         let p = gameState.players[gameState.turnIndex];
-        if (p.id !== peerId) return;
+        if (!p || p.id !== peerId) return;
 
         if (action === 'fold') {
             sfx.fold();
@@ -953,6 +928,10 @@ Additions made:
             endGameHost(`${activePlayers[0].name} wins! Everyone else folded.`);
             return;
         }
+        if (activePlayers.length === 0) {
+            endGameHost("Everyone folded. House wins!");
+            return;
+        }
 
         let roundOver = activePlayers.every(p => p.hasActed && p.currentBet === gameState.currentHighestBet);
 
@@ -961,7 +940,7 @@ Additions made:
         } else {
             do {
                 gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
-            } while (gameState.players[gameState.turnIndex].folded);
+            } while (gameState.players[gameState.turnIndex] && gameState.players[gameState.turnIndex].folded);
             broadcastGameState();
         }
     }
@@ -1096,7 +1075,7 @@ Additions made:
                 }
             }
 
-            trackerHtml += `<div class="${classes}" id="player-badge-${p.id}">
+            trackerHtml += `<div class="${classes}" id="badge-${p.id}">
                 <div class="p-bank">$${p.bank}</div>
                 <div class="p-bet">${betText}</div>
                 ${miniCardsHtml}
@@ -1223,6 +1202,61 @@ Additions made:
         clientConnections.forEach(conn => conn.send({ type: 'CLOSE_DICE' }));
         el('dice-overlay').style.display = 'none';
         endGameHost("Chaos concluded.");
+    }
+
+    /* --- HATBOX & EMOJI LOGIC --- */
+    function sendEmoji(emojiChar) {
+        if (!emojiChar || emojiChar.trim() === '') return;
+        
+        if (isHost) {
+            broadcastEmoji(myId, emojiChar);
+        } else if (hostConnection) {
+            hostConnection.send({ type: 'EMOJI', id: myId, emoji: emojiChar });
+        }
+    }
+
+    function sendCustomEmoji() {
+        let inputEl = el('emoji-input');
+        let val = inputEl.value;
+        if (val) {
+            sendEmoji(val);
+            inputEl.value = '';
+        }
+    }
+
+    function broadcastEmoji(senderId, emojiChar) {
+        // Show it locally on Host
+        showFloatingEmoji(senderId, emojiChar);
+        // Dispatch to all connected clients
+        clientConnections.forEach(conn => {
+            conn.send({ type: 'SHOW_EMOJI', senderId: senderId, emoji: emojiChar });
+        });
+    }
+
+    function showFloatingEmoji(senderId, emojiChar) {
+        let floatingEl = document.createElement('div');
+        floatingEl.className = 'floating-emoji';
+        floatingEl.innerText = emojiChar;
+
+        // Try to append it to the sender's player badge to float up from there
+        let targetBadge = el(`badge-${senderId}`);
+        if (targetBadge) {
+            floatingEl.style.top = '0px';
+            floatingEl.style.left = '50%';
+            targetBadge.appendChild(floatingEl);
+        } else {
+            // Fallback to center screen if badge isn't found
+            floatingEl.style.top = '50%';
+            floatingEl.style.left = '50%';
+            document.body.appendChild(floatingEl);
+        }
+
+        // Cleanup after animation completes
+        setTimeout(() => {
+            if (floatingEl.parentNode) {
+                floatingEl.parentNode.removeChild(floatingEl);
+            }
+        }, 2500);
     }
 </script>
 </body>
