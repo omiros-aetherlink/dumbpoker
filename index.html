@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dumb Poker - Multiplayer</title>
+    <title>Dumb Cards - Multiplayer</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -43,6 +43,7 @@
         body.theme-whitewhite .p-name { color: #001f4d; }
         body.theme-whitewhite .p-bank { color: #008800; }
         body.theme-whitewhite .p-bet { color: #555; }
+        body.theme-whitewhite .p-stats { color: #0044cc; }
         body.theme-whitewhite .board-container { background: rgba(255, 255, 255, 0.7); border: 2px solid #0044cc; box-shadow: 0 4px 15px rgba(0, 68, 204, 0.15); }
         body.theme-whitewhite .local-player-area { background: rgba(255, 255, 255, 0.9); border: 2px solid #0044cc; color: #001f4d; box-shadow: 0 4px 15px rgba(0, 68, 204, 0.15); }
         body.theme-whitewhite .section-label { color: #0044cc; }
@@ -114,13 +115,15 @@
             min-width: 90px;
             transition: 0.3s;
         }
+        #table-section-xing .player-badge { min-width: 110px; }
         .player-badge.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); background: rgba(212,175,55,0.1); transform: translateY(-2px);}
         .player-badge.folded { opacity: 0.35; filter: grayscale(1); }
         .p-name { font-weight: bold; font-size: 13px; margin-top: 4px; }
         .p-bank { font-size: 13px; color: #4caf50; font-weight: bold; margin-bottom: 2px; }
         .p-bet { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+        .p-stats { font-size: 12px; color: var(--gold); font-weight: bold; margin-bottom: 2px; }
 
-        /* --- MINI CARDS FOR OPPONENTS --- */
+        /* --- MINI CARDS FOR OPPONENTS (Dumb Cards) --- */
         .mini-cards { display: flex; gap: 3px; justify-content: center; margin: 2px 0; }
         .mini-card {
             width: 20px; height: 28px; background: white; border-radius: 3px; font-size: 9px; font-weight: bold;
@@ -136,17 +139,26 @@
         }
         .mini-card.folded-card { opacity: 0.4; }
 
-        /* --- CARDS --- */
+        /* --- CARDS & MIDDLE STACK --- */
         .board-container {
             display: flex;
-            gap: 20px; 
             background: rgba(0,0,0,0.3);
             padding: 12px 20px;
             border-radius: 60px;
             border: 2px solid rgba(212, 175, 55, 0.3);
             margin: 5px 0;
+            align-items: center;
+            justify-content: center;
         }
+        #table-section-poker .board-container { gap: 20px; }
+        #table-section-xing .board-container { padding: 15px 30px; min-height: 110px; }
         .card-group { display: flex; gap: 10px; }
+
+        .middle-stack {
+            position: relative;
+            width: 155px;
+            height: 110px;
+        }
 
         .card {
             width: 75px;
@@ -162,8 +174,23 @@
             position: relative;
             user-select: none;
         }
+        .card.stack-card { position: absolute; top: 0; transition: all 0.3s ease; }
+        .card.hand-card { cursor: pointer; transition: transform 0.2s ease; }
+        .card.hand-card:hover { transform: translateY(-6px); }
+
         .card.red { color: #d32f2f; }
         .card.black { color: #212121; }
+
+        /* Corner index (top-left value) so the card's rank is always readable
+           even when cards overlap in the middle stack */
+        .card .corner-index {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            line-height: 1;
+        }
 
         .card.hidden {
             background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.15) 4px, rgba(0,0,0,0.15) 8px),
@@ -175,9 +202,13 @@
         .card.hidden span { display: none; }
 
         /* --- POT & MESSAGES --- */
-        .info-panel { text-align: center; height: 55px; }
+        .info-panel { text-align: center; }
+        #table-section-poker .info-panel { height: 55px; }
+        #table-section-xing .info-panel { height: 50px; }
         .pot { font-size: 26px; color: var(--gold); font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        .message { font-size: 15px; margin-top: 3px; color: #fff; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 15px; display: inline-block;}
+        .message { font-size: 15px; margin-top: 3px; color: #fff; background: rgba(0,0,0,0.6); border-radius: 15px; display: inline-block;}
+        #table-section-poker .message { padding: 4px 12px; }
+        #table-section-xing .message { padding: 6px 16px; }
 
         /* --- LOCAL PLAYER AREA & BALANCE --- */
         .local-player-area {
@@ -192,9 +223,10 @@
             max-width: 500px;
             margin-bottom: 5px;
         }
-        .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;}
+        .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;}
         .p-balance { font-size: 15px; color: #4caf50; font-weight: bold; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        .hand-container { display: flex; gap: 12px; margin-bottom: 10px; }
+        .hand-container { display: flex; gap: 12px; margin-bottom: 5px; }
+        #table-section-xing .hand-container { min-height: 110px; }
 
         .controls { display: flex; flex-direction: column; gap: 8px; width: 100%; align-items: center;}
         .chip-rack { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;}
@@ -249,7 +281,8 @@
 
         @media (max-width: 600px) {
             .card { width: 60px; height: 90px; font-size: 22px; }
-            .board-container { gap: 10px; padding: 8px 12px; }
+            .middle-stack { width: 130px; height: 90px; }
+            .board-container { padding: 10px 15px; }
             .local-player-area { padding: 8px 10px; }
         }
     </style>
@@ -272,10 +305,18 @@
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
-        <h1 style="font-size: 34px;">Dumb Poker</h1>
-        <p style="color: #aaa; margin-bottom: 15px;">True Multi-Device P2P Edition</p>
+        <h1 style="font-size: 34px;">Dumb Cards</h1>
+        <p style="color: #aaa; margin-bottom: 15px;">Multi-Device P2P Card Games</p>
         
         <input type="text" id="player-name-input" placeholder="Your Name" maxlength="12" value="Player 1">
+
+        <div style="margin-top: 10px;">
+            <label style="font-size: 13px; color: #aaa;">Choose a Game:</label><br>
+            <select id="game-type-select">
+                <option value="xing">Xing</option>
+                <option value="poker">Dumb Cards (Poker)</option>
+            </select>
+        </div>
         
         <div style="margin-top: 15px;">
             <button onclick="hostGame()">Host New Game</button>
@@ -290,6 +331,7 @@
     <div class="screen" id="lobby-screen" style="display: none;">
         <h1>Game Lobby</h1>
         <p>Room Code: <span id="display-room-code" style="color: var(--gold); font-size: 28px; font-weight: bold; letter-spacing: 2px;">----</span></p>
+        <p style="color: #aaa; font-size: 13px;">Game: <span id="display-game-mode" style="color: var(--gold); font-weight: bold;">Xing</span></p>
         
         <div id="host-theme-box" style="margin: 10px 0;">
             <label style="font-size: 13px; color: #aaa;">Table Theme:</label><br>
@@ -315,11 +357,12 @@
         <p id="guest-waiting-text" style="color: #aaa; font-size: 13px;">Waiting for host to start...</p>
     </div>
 
-    <h1>Dumb Poker</h1>
+    <h1 id="game-title">Dumb Cards</h1>
 
-    <div class="table-section" id="table-section">
+    <!-- ===================== DUMB CARDS (POKER) TABLE ===================== -->
+    <div class="table-section" id="table-section-poker">
         <!-- Player Trackers -->
-        <div class="player-tracker" id="player-tracker"></div>
+        <div class="player-tracker" id="player-tracker-poker"></div>
 
         <!-- Community Board -->
         <div class="board-container">
@@ -329,35 +372,60 @@
 
         <div class="info-panel">
             <div class="pot">Pot: $<span id="pot-amount">0</span></div>
-            <div class="message" id="message">Game starting...</div>
+            <div class="message" id="message-poker">Game starting...</div>
         </div>
 
         <!-- Local Area -->
         <div class="local-player-area">
-            <div class="section-label" id="turn-status-label">Your Pocket Cards</div>
+            <div class="section-label" id="turn-status-label-poker">Your Pocket Cards</div>
             <div class="p-balance" id="local-balance">Balance: $130</div>
-            <div class="hand-container" id="local-hand"></div>
+            <div class="hand-container" id="local-hand-poker"></div>
 
             <div class="controls" id="action-controls" style="display:none;">
                 <div style="display: flex; gap: 10px; margin-bottom: 6px;">
-                    <button class="btn-call" id="btn-call" onclick="sendAction('call')">Match</button>
-                    <button class="btn-fold" id="btn-fold" onclick="sendAction('fold')">Fold</button>
+                    <button class="btn-call" id="btn-call" onclick="pokerSendAction('call')">Match</button>
+                    <button class="btn-fold" id="btn-fold" onclick="pokerSendAction('fold')">Fold</button>
                 </div>
                 <div class="chip-rack" id="action-rack">
-                    <button class="chip" onclick="sendAction('raise', 5)">$5</button>
-                    <button class="chip" onclick="sendAction('raise', 10)">$10</button>
-                    <button class="chip" onclick="sendAction('raise', 15)">$15</button>
-                    <button class="chip" onclick="sendAction('raise', 25)">$25</button>
-                    <button class="chip" onclick="sendAction('raise', 50)">$50</button>
+                    <button class="chip" onclick="pokerSendAction('raise', 5)">$5</button>
+                    <button class="chip" onclick="pokerSendAction('raise', 10)">$10</button>
+                    <button class="chip" onclick="pokerSendAction('raise', 15)">$15</button>
+                    <button class="chip" onclick="pokerSendAction('raise', 25)">$25</button>
+                    <button class="chip" onclick="pokerSendAction('raise', 50)">$50</button>
                 </div>
             </div>
-            <button class="btn-loan" onclick="sendAction('loan')" style="margin-top: 6px;">Take Bank Loan (+$100)</button>
+            <button class="btn-loan" onclick="pokerSendAction('loan')" style="margin-top: 6px;">Take Bank Loan (+$100)</button>
         </div>
         
-        <button class="btn-deal" id="btn-deal" onclick="hostNextRound()">Deal Next Round</button>
+        <button class="btn-deal" id="btn-deal-poker" onclick="hostNextRound()">Deal Next Round</button>
     </div>
 
-    <!-- Dice Roll -->
+    <!-- ===================== XING TABLE ===================== -->
+    <div class="table-section" id="table-section-xing">
+        <!-- Player Trackers -->
+        <div class="player-tracker" id="player-tracker-xing"></div>
+
+        <!-- Middle Stack Container -->
+        <div class="board-container">
+            <div class="middle-stack" id="middle-stack">
+                <!-- Stack cards rendered here -->
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="message" id="message-xing">Game starting...</div>
+        </div>
+
+        <!-- Local Area -->
+        <div class="local-player-area">
+            <div class="section-label" id="turn-status-label-xing">Your Hand</div>
+            <div class="hand-container" id="local-hand-xing"></div>
+        </div>
+        
+        <button class="btn-deal" id="btn-deal-xing" onclick="hostDealNextDeck()">Deal Next Deck (First to 50)</button>
+    </div>
+
+    <!-- Dice Roll (Dumb Cards tiebreaker) -->
     <div class="dice-overlay" id="dice-overlay">
         <h2 style="font-size: 32px; margin-bottom: 0;">SUDDEN DEATH TIE!</h2>
         <p style="margin-top: 4px;">Highest roll takes the pot.</p>
@@ -514,6 +582,13 @@
         dice: () => { for(let i=0;i<5;i++) setTimeout(()=>playTone(300+Math.random()*500, 'square', 0.05), i*50); }
     };
 
+    /* ============================================================
+       SHARED STATE & CONNECTION LAYER
+       One room code / one PeerJS namespace for both games. The host
+       picks the game on the setup screen; guests just join the code
+       and inherit whichever game the host chose.
+       ============================================================ */
+
     let peer = null;
     let isHost = false;
     let myId = null;
@@ -525,15 +600,20 @@
     let clientConnections = [];
 
     let gameState = {
+        gameType: 'xing',      // 'xing' or 'poker'
         players: [],
         deck: [],
-        board: [],
-        state: 0,
-        pot: 0,
-        currentHighestBet: 0,
+        board: [],              // poker: community board
+        boardStack: [],         // xing: middle pickup stack
+        state: 0,                // poker: betting phase
+        pot: 0,                  // poker
+        currentHighestBet: 0,     // poker
         turnIndex: 0,
+        lastCapturePlayerId: null, // xing
         theme: "theme-green",
-        message: "Game starting..."
+        message: "Game starting...",
+        gameOver: false,          // xing
+        started: false
     };
 
     const suits = ['♥', '♦', '♣', '♠'];
@@ -541,12 +621,11 @@
     const getRank = (val) => values.indexOf(val);
 
     const el = (id) => document.getElementById(id);
-    
+
     function msg(text) {
         gameState.message = text;
-        if (el('message')) {
-            el('message').innerText = text;
-        }
+        let target = gameState.gameType === 'poker' ? el('message-poker') : el('message-xing');
+        if (target) target.innerText = text;
     }
 
     function changeThemeLocally(themeName) {
@@ -560,23 +639,42 @@
         return Math.random().toString(36).substring(2, 6).toUpperCase();
     }
 
+    function gameLabel(type) {
+        return type === 'poker' ? 'Dumb Cards' : 'Xing';
+    }
+
+    function showActiveTableSection() {
+        el('table-section-poker').style.display = gameState.gameType === 'poker' ? 'flex' : 'none';
+        el('table-section-xing').style.display = gameState.gameType === 'xing' ? 'flex' : 'none';
+        el('game-title').innerText = gameLabel(gameState.gameType);
+    }
+
+    function createPlayerObj(id, name) {
+        if (gameState.gameType === 'poker') {
+            return { id: id, name: name, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false };
+        }
+        return { id: id, name: name, cards: [], score: 0, collectedCards: 0, xings: 0, jackXings: 0 };
+    }
+
     function hostGame() {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         myName = el('player-name-input').value.trim() || "Host";
+        gameState.gameType = el('game-type-select').value;
         roomCode = generateCode();
         isHost = true;
         
-        peer = new Peer('dumbpoker-' + roomCode);
+        peer = new Peer('dumbcards-' + roomCode);
         
         peer.on('open', (id) => {
             myId = id;
             el('setup-screen').style.display = 'none';
             el('lobby-screen').style.display = 'flex';
             el('display-room-code').innerText = roomCode;
+            el('display-game-mode').innerText = gameLabel(gameState.gameType);
             el('host-theme-box').style.display = 'block';
             el('guest-waiting-text').style.display = 'none';
             
-            gameState.players.push({ id: myId, name: myName, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false });
+            gameState.players.push(createPlayerObj(myId, myName));
             updateLobbyUI();
         });
 
@@ -585,8 +683,21 @@
             conn.on('data', (data) => handleHostIncomingData(data, conn));
             conn.on('close', () => {
                 gameState.players = gameState.players.filter(p => p.id !== conn.peer);
-                updateLobbyUI();
-                broadcastLobby();
+
+                // Keep turnIndex pointing at a valid player so the next
+                // move doesn't crash on an out-of-range array access.
+                if (gameState.turnIndex >= gameState.players.length) {
+                    gameState.turnIndex = 0;
+                }
+
+                if (gameState.started) {
+                    // Game already in progress: sync the table right away
+                    // instead of leaving other clients on a stale player list.
+                    broadcastGameState("A player disconnected.");
+                } else {
+                    updateLobbyUI();
+                    broadcastLobby();
+                }
             });
         });
     }
@@ -606,7 +717,7 @@
 
         peer.on('open', (id) => {
             myId = id;
-            hostConnection = peer.connect('dumbpoker-' + roomCode);
+            hostConnection = peer.connect('dumbcards-' + roomCode);
 
             hostConnection.on('open', () => {
                 hostConnection.send({ type: 'JOIN', name: myName, id: myId });
@@ -631,25 +742,32 @@
             listHtml += `<li style="padding: 4px 0;">👤 ${p.name}</li>`;
         });
         el('lobby-player-list').innerHTML = listHtml;
+        el('display-game-mode').innerText = gameLabel(gameState.gameType);
         if (isHost) {
             let startBtn = el('host-start-btn');
             startBtn.style.display = 'inline-block';
-            startBtn.disabled = gameState.players.length < 1;
+            // Require at least 2 players - the host alone counts as 1,
+            // so "< 1" let the host start a "multiplayer" game solo.
+            startBtn.disabled = gameState.players.length < 2;
         }
     }
 
     function broadcastLobby() {
-        let lobbyData = { type: 'LOBBY_UPDATE', players: gameState.players, theme: gameState.theme };
+        let lobbyData = { type: 'LOBBY_UPDATE', players: gameState.players, theme: gameState.theme, gameType: gameState.gameType };
         clientConnections.forEach(conn => conn.send(lobbyData));
     }
 
     function handleHostIncomingData(data, conn) {
         if (data.type === 'JOIN') {
-            gameState.players.push({ id: data.id, name: data.name, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false });
+            gameState.players.push(createPlayerObj(data.id, data.name));
             updateLobbyUI();
             broadcastLobby();
         } else if (data.type === 'ACTION') {
-            processPlayerAction(conn.peer, data.action, data.amount);
+            if (gameState.gameType === 'poker') {
+                pokerProcessPlayerAction(conn.peer, data.action, data.amount);
+            } else {
+                xingProcessPlayerAction(conn.peer, data.cardIndex);
+            }
         } else if (data.type === 'CLOSE_DICE_REQUEST') {
             hostCloseDice();
         }
@@ -658,15 +776,17 @@
     function handleClientIncomingData(data) {
         if (data.type === 'LOBBY_UPDATE') {
             gameState.players = data.players;
+            gameState.gameType = data.gameType;
             changeThemeLocally(data.theme);
             updateLobbyUI();
         } else if (data.type === 'GAME_START' || data.type === 'STATE_UPDATE') {
             el('lobby-screen').style.display = 'none';
-            el('table-section').style.display = 'flex';
             gameState = data.gameState;
+            showActiveTableSection();
             changeThemeLocally(gameState.theme);
             if (gameState.message) {
-                el('message').innerText = gameState.message;
+                let target = gameState.gameType === 'poker' ? el('message-poker') : el('message-xing');
+                if (target) target.innerText = gameState.message;
             }
             renderClientTable();
         } else if (data.type === 'DICE_TRIGGER') {
@@ -683,19 +803,58 @@
     function hostStartGame() {
         if (!isHost) return;
         el('lobby-screen').style.display = 'none';
-        el('table-section').style.display = 'flex';
-        gameState.deck = buildDeck();
-        hostNextRound();
+        gameState.started = true;
+        showActiveTableSection();
+
+        if (gameState.gameType === 'poker') {
+            gameState.deck = pokerBuildDeck();
+            hostNextRound();
+        } else {
+            gameState.players.forEach(p => {
+                p.score = 0;
+                p.collectedCards = 0;
+                p.xings = 0;
+                p.jackXings = 0;
+            });
+            gameState.gameOver = false;
+            hostStartNewDeck();
+        }
     }
 
-    function buildDeck() {
+    function broadcastGameState(customMsg) {
+        if (customMsg) msg(customMsg);
+        clientConnections.forEach(conn => {
+            conn.send({ type: 'STATE_UPDATE', gameState: gameState });
+        });
+        renderClientTable();
+    }
+
+    function renderClientTable() {
+        if (gameState.gameType === 'poker') {
+            pokerRenderClientTable();
+        } else {
+            xingRenderClientTable();
+        }
+    }
+
+    /* ============================================================
+       DUMB CARDS (POKER) GAME LOGIC
+       ============================================================ */
+
+    function pokerBuildDeck() {
         let deck = [];
         for (let suit of suits) {
             for (let value of values) {
                 deck.push({ suit, value, rank: getRank(value), color: (suit === '♥' || suit === '♦') ? 'red' : 'black' });
             }
         }
-        return deck.sort(() => Math.random() - 0.5);
+        // Fisher-Yates shuffle: sort(() => Math.random() - 0.5) is biased
+        // and doesn't produce a uniformly random ordering.
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        return deck;
     }
 
     function hostNextRound() {
@@ -726,9 +885,9 @@
         broadcastGameState("Pre-Flop: Pass or Bet.");
     }
 
-    function processPlayerAction(peerId, action, amount) {
+    function pokerProcessPlayerAction(peerId, action, amount) {
         let p = gameState.players[gameState.turnIndex];
-        if (p.id !== peerId) return;
+        if (!p || p.id !== peerId) return;
 
         if (action === 'fold') {
             sfx.fold();
@@ -826,15 +985,6 @@
         broadcastGameState();
     }
 
-    function broadcastGameState(customMsg) {
-        if (customMsg) msg(customMsg);
-        
-        clientConnections.forEach(conn => {
-            conn.send({ type: 'STATE_UPDATE', gameState: gameState });
-        });
-        renderClientTable();
-    }
-
     function evaluateHostWinner() {
         gameState.state = 6;
         sfx.flip();
@@ -888,18 +1038,18 @@
         msg(message);
         gameState.state = 6;
         broadcastGameState(message);
-        el('btn-deal').style.display = 'block';
+        el('btn-deal-poker').style.display = 'block';
     }
 
-    function sendAction(action, amount = 0) {
+    function pokerSendAction(action, amount = 0) {
         if (isHost) {
-            processPlayerAction(myId, action, amount);
+            pokerProcessPlayerAction(myId, action, amount);
         } else {
             hostConnection.send({ type: 'ACTION', action: action, amount: amount });
         }
     }
 
-    function renderClientTable() {
+    function pokerRenderClientTable() {
         el('pot-amount').innerText = gameState.pot;
         
         let me = gameState.players.find(p => p.id === myId);
@@ -936,7 +1086,7 @@
                 <div class="p-name">${p.name}</div>
             </div>`;
         });
-        el('player-tracker').innerHTML = trackerHtml;
+        el('player-tracker-poker').innerHTML = trackerHtml;
 
         let b1 = '', b2 = '';
         for(let i=0; i<5; i++) {
@@ -948,12 +1098,12 @@
         el('board-group-2').innerHTML = b2;
 
         if (me && me.cards.length === 2) {
-            el('local-hand').innerHTML = createCardHTML(me.cards[0]) + createCardHTML(me.cards[1]);
+            el('local-hand-poker').innerHTML = createCardHTML(me.cards[0]) + createCardHTML(me.cards[1]);
         }
 
         let myTurn = gameState.players[gameState.turnIndex]?.id === myId && gameState.state < 6;
         let actionControls = el('action-controls');
-        let statusLabel = el('turn-status-label');
+        let statusLabel = el('turn-status-label-poker');
         
         if (myTurn) {
             actionControls.style.display = 'flex';
@@ -966,16 +1116,16 @@
         }
 
         if (isHost && gameState.state === 6) {
-            el('btn-deal').style.display = 'block';
+            el('btn-deal-poker').style.display = 'block';
         } else {
-            el('btn-deal').style.display = 'none';
+            el('btn-deal-poker').style.display = 'none';
         }
     }
 
     function createCardHTML(card, hidden = false) {
         if (!card) return '';
         if (hidden) return `<div class="card hidden"><span></span></div>`;
-        return `<div class="card ${card.color}"><span>${card.value}<br>${card.suit}</span></div>`;
+        return `<div class="card ${card.color}"><span class="corner-index">${card.value}</span><span>${card.value}<br>${card.suit}</span></div>`;
     }
 
     function triggerDiceOverlay(tiedPlayers) {
@@ -1057,7 +1207,246 @@
         el('dice-overlay').style.display = 'none';
         endGameHost("Chaos concluded.");
     }
+
+    /* ============================================================
+       XING GAME LOGIC
+       ============================================================ */
+
+    function xingBuildDeck() {
+        let deck = [];
+        for (let suit of suits) {
+            for (let value of values) {
+                deck.push({ suit, value, color: (suit === '♥' || suit === '♦') ? 'red' : 'black' });
+            }
+        }
+        // Fisher-Yates shuffle: sort(() => Math.random() - 0.5) is biased
+        // and doesn't produce a uniformly random ordering.
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        return deck;
+    }
+
+    function hostStartNewDeck() {
+        if (!isHost) return;
+        gameState.deck = xingBuildDeck();
+        gameState.boardStack = [];
+        
+        // Place 4 initial cards on the middle stack
+        for (let i = 0; i < 4; i++) {
+            if (gameState.deck.length > 0) gameState.boardStack.push(gameState.deck.pop());
+        }
+
+        hostDealCardsToPlayers();
+    }
+
+    function hostDealCardsToPlayers() {
+        if (!isHost) return;
+
+        // If deck is empty and players are out of cards, tally round scoring
+        if (gameState.deck.length === 0) {
+            let allEmpty = gameState.players.every(p => p.cards.length === 0);
+            if (allEmpty) {
+                endRoundScoring();
+                return;
+            }
+        }
+
+        // Deal 4 cards to each player if their hands are empty
+        let needsCards = gameState.players.every(p => p.cards.length === 0);
+        if (needsCards && gameState.deck.length > 0) {
+            gameState.players.forEach(p => {
+                p.cards = [];
+                for (let i = 0; i < 4; i++) {
+                    if (gameState.deck.length > 0) p.cards.push(gameState.deck.pop());
+                }
+            });
+        }
+
+        broadcastGameState("Turn active. Make your move!");
+    }
+
+    function xingProcessPlayerAction(peerId, cardIndex) {
+        let p = gameState.players[gameState.turnIndex];
+        if (!p || p.id !== peerId || p.cards.length <= cardIndex) return;
+
+        let playedCard = p.cards.splice(cardIndex, 1)[0];
+        let topCard = gameState.boardStack.length > 0 ? gameState.boardStack[gameState.boardStack.length - 1] : null;
+
+        let isCapture = false;
+        let isXing = false;
+        let isJackXing = false;
+        let isJack = (playedCard.value === 'J');
+
+        if (topCard) {
+            let isMatch = (playedCard.value === topCard.value);
+
+            if (isMatch || isJack) {
+                isCapture = true;
+                
+                // Rules check for Xings
+                if (gameState.boardStack.length === 1) {
+                    if (isMatch && isJack) {
+                        isJackXing = true; // Bottom card is a Jack, and player matched it with a Jack
+                    } else if (isMatch && !isJack) {
+                        isXing = true; // Single card down and regular value match
+                    }
+                    // If 1 card down and played a Jack (non-match), it is a standard pickup, NOT a Xing.
+                }
+            }
+        } else {
+            // If no cards are down on the board stack, drop the card normally
+            // (Handled below by simply pushing to boardStack)
+        }
+
+        let actionMsg = `${p.name} dropped ${playedCard.value}${playedCard.suit}.`;
+
+        if (isCapture) {
+            gameState.boardStack.push(playedCard);
+            let collectedCount = gameState.boardStack.length;
+            p.collectedCards += collectedCount;
+            gameState.lastCapturePlayerId = p.id;
+
+            if (isJackXing) {
+                p.jackXings++;
+                actionMsg = `🌟 JACK XING! 🌟 ${p.name} sweeps! (+30pts)`;
+            } else if (isXing) {
+                p.xings++;
+                actionMsg = `🔥 XING! 🔥 ${p.name} sweeps! (+10pts)`;
+            } else {
+                actionMsg = `${p.name} collected ${collectedCount} cards.`;
+            }
+
+            gameState.boardStack = [];
+        } else {
+            gameState.boardStack.push(playedCard);
+        }
+
+        // Next player turn
+        gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+
+        // Check if hand dealing / round progression is needed
+        let allHandsEmpty = gameState.players.every(player => player.cards.length === 0);
+        if (allHandsEmpty) {
+            if (gameState.deck.length > 0) {
+                setTimeout(() => hostDealCardsToPlayers(), 1000);
+            } else {
+                setTimeout(() => endRoundScoring(), 1000);
+            }
+        }
+
+        broadcastGameState(actionMsg);
+    }
+
+    function endRoundScoring() {
+        // Any remaining board cards go to the last player who captured cards
+        if (gameState.boardStack.length > 0 && gameState.lastCapturePlayerId) {
+            let luckyP = gameState.players.find(p => p.id === gameState.lastCapturePlayerId);
+            if (luckyP) luckyP.collectedCards += gameState.boardStack.length;
+            gameState.boardStack = [];
+        }
+
+        // Determine who collected the most cards
+        let maxCards = 0;
+        gameState.players.forEach(p => {
+            if (p.collectedCards > maxCards) maxCards = p.collectedCards;
+        });
+
+        // Tally points
+        gameState.players.forEach(p => {
+            let roundPts = 0;
+            roundPts += p.xings * 10;
+            roundPts += p.jackXings * 30;
+            if (p.collectedCards === maxCards && maxCards > 0) roundPts += 5; // 5 points for most cards
+            p.score += roundPts;
+
+            // Reset deck-specific counters
+            p.collectedCards = 0;
+            p.xings = 0;
+            p.jackXings = 0;
+        });
+
+        // Check if someone reached 50 points
+        let winner = gameState.players.find(p => p.score >= 50);
+        if (winner) {
+            gameState.gameOver = true;
+            broadcastGameState(`🏆 ${winner.name} WINS THE GAME WITH ${winner.score} POINTS! 🏆`);
+        } else {
+            broadcastGameState("Deck completed! Scores updated. Host can deal the next deck.");
+        }
+    }
+
+    function xingSendAction(action, data) {
+        if (isHost) {
+            if (action === 'playCard') xingProcessPlayerAction(myId, data);
+        } else {
+            hostConnection.send({ type: 'ACTION', cardIndex: data });
+        }
+    }
+
+    function hostDealNextDeck() {
+        if (!isHost) return;
+        hostStartNewDeck();
+    }
+
+    function xingRenderClientTable() {
+        let me = gameState.players.find(p => p.id === myId);
+
+        // Render player track badges
+        let trackerHtml = '';
+        gameState.players.forEach((p, i) => {
+            let classes = "player-badge";
+            if (i === gameState.turnIndex && !gameState.gameOver) classes += " active";
+            
+            trackerHtml += `<div class="${classes}">
+                <div class="p-name">${p.name}</div>
+                <div class="p-stats">Score: ${p.score}</div>
+                <div style="font-size: 11px; color: #ddd;">Cards Hand: ${p.cards.length}</div>
+            </div>`;
+        });
+        el('player-tracker-xing').innerHTML = trackerHtml;
+
+        // Render middle stack layout: only top card fully visible, up to 3 cards beneath showing a small piece on the left
+        let stackHTML = '';
+        let visibleCards = gameState.boardStack.slice(-4);
+        
+        visibleCards.forEach((c, idx) => {
+            let leftOffset = idx * 25; // Shifts preceding cards slightly left so only a small piece shows value
+            let isTop = (idx === visibleCards.length - 1);
+            let displayStyle = isTop ? `left: ${leftOffset}px; z-index: ${idx};` : `left: ${leftOffset}px; z-index: ${idx}; filter: brightness(0.85);`;
+            
+            stackHTML += `<div class="card ${c.color} stack-card" style="${displayStyle}">
+                <span class="corner-index">${c.value}</span>
+                <span>${c.value}<br>${c.suit}</span>
+            </div>`;
+        });
+        el('middle-stack').innerHTML = stackHTML;
+
+        // Render local user hand
+        if (me) {
+            let handHTML = '';
+            me.cards.forEach((c, i) => {
+                let isMyTurn = (gameState.players[gameState.turnIndex]?.id === myId && !gameState.gameOver);
+                let clickAttr = isMyTurn ? `onclick="xingSendAction('playCard', ${i})"` : '';
+                handHTML += `<div class="card ${c.color} hand-card" ${clickAttr}>
+                    <span class="corner-index">${c.value}</span>
+                    <span>${c.value}<br>${c.suit}</span>
+                </div>`;
+            });
+            el('local-hand-xing').innerHTML = handHTML;
+        }
+
+        // Turn status & deal controls
+        let myTurn = gameState.players[gameState.turnIndex]?.id === myId && !gameState.gameOver;
+        el('turn-status-label-xing').innerText = myTurn ? "Your Turn - Drop a Card" : "Waiting for other player...";
+
+        if (isHost && gameState.deck.length === 0 && gameState.players.every(p => p.cards.length === 0) && !gameState.gameOver) {
+            el('btn-deal-xing').style.display = 'block';
+        } else {
+            el('btn-deal-xing').style.display = 'none';
+        }
+    }
 </script>
 </body>
 </html>
-
