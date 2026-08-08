@@ -1,8 +1,3 @@
-Here is the corrected code. I have fixed a few critical bugs in the provided implementation that were breaking both the UI and the game logic:
- * Fatal HTML Parsing Error (Hatbox Regex): The regex in the emoji input field contained an unescaped double quote (") that prematurely closed the oninput HTML attribute, breaking the element entirely. This was replaced with a much cleaner [\x00-\x7F] regex, which strips all ASCII characters (letters, numbers, basic punctuation), leaving only emojis and extended unicode behind without breaking HTML syntax.
- * Turn-Skipping Disconnect Bug: In the Host's disconnection handler, splicing the active player from the array and then calling advanceHostTurn() caused the turn index to increment twice. This skipped the turn of whoever was next in line. The new logic evaluates round completion locally in the handler without skipping players.
- * Global Event Deprecation: The event.stopPropagation() calls in the inline HTML for the music buttons relied on the deprecated global window.event. These were updated to explicitly pass the event object onclick="toggleMute(event)".
-Corrected Code
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,7 +21,40 @@ Corrected Code
         body.theme-crimson { --felt: #4a1c1c; --felt-1: #6d2929; --felt-2: #290e0e; }
         body.theme-teal { --felt: #004d40; --felt-1: #00695c; --felt-2: #00251a; }
         body.theme-orange { --felt: #a83f02; --felt-1: #c94b02; --felt-2: #5e2300; }
-        body.theme-whitewhite { --felt: #ffffff; --felt-1: #e0e6ed; --felt-2: #b0c4de; }
+
+        /* --- WHITE & BLUE THEME OVERRIDES --- */
+        body.theme-whitewhite {
+            --felt: #ffffff;
+            --felt-1: #f4f7f9;
+            --felt-2: #d9e2ec;
+            --gold: #0044cc; /* Override gold to Royal Blue */
+            color: #001f4d; /* Dark navy text */
+        }
+        body.theme-whitewhite h1 { color: var(--gold); text-shadow: none; }
+        body.theme-whitewhite .screen { background: rgba(255, 255, 255, 0.97); color: #001f4d; }
+        body.theme-whitewhite .screen p { color: #0044cc !important; }
+        body.theme-whitewhite .screen input, 
+        body.theme-whitewhite .screen select { background: #ffffff; color: #001f4d; border: 2px solid #0044cc; }
+        body.theme-whitewhite .screen button,
+        body.theme-whitewhite .dice-btn { background: #0044cc; color: white; }
+        body.theme-whitewhite .message { background: #0044cc; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        body.theme-whitewhite .player-badge { background: rgba(255, 255, 255, 0.9); border: 2px solid #a6c1ee; color: #001f4d; }
+        body.theme-whitewhite .player-badge.active { border-color: #0044cc; box-shadow: 0 0 12px rgba(0, 68, 204, 0.4); background: rgba(0, 68, 204, 0.08); }
+        body.theme-whitewhite .p-name { color: #001f4d; }
+        body.theme-whitewhite .p-bank { color: #008800; }
+        body.theme-whitewhite .p-bet { color: #555; }
+        body.theme-whitewhite .board-container { background: rgba(255, 255, 255, 0.7); border: 2px solid #0044cc; box-shadow: 0 4px 15px rgba(0, 68, 204, 0.15); }
+        body.theme-whitewhite .local-player-area { background: rgba(255, 255, 255, 0.9); border: 2px solid #0044cc; color: #001f4d; box-shadow: 0 4px 15px rgba(0, 68, 204, 0.15); }
+        body.theme-whitewhite .section-label { color: #0044cc; }
+        body.theme-whitewhite .pot { color: #0044cc; text-shadow: none; }
+        body.theme-whitewhite .music-btn { background: white; border: 2px solid #0044cc; color: #0044cc; }
+        body.theme-whitewhite .music-btn:hover { background: #0044cc; color: white; }
+        body.theme-whitewhite .dice-overlay { background: rgba(255, 255, 255, 0.95); }
+        body.theme-whitewhite .dice-overlay h2,
+        body.theme-whitewhite .dice-overlay p { color: #0044cc !important; }
+        body.theme-whitewhite .dice-box h3 { color: #0044cc !important; }
+        body.theme-whitewhite #lobby-player-list li { border-bottom: 1px solid rgba(0, 68, 204, 0.2); }
+        /* ------------------------------------ */
 
         body {
             background-color: var(--felt);
@@ -44,61 +72,6 @@ Corrected Code
             transition: background 0.5s ease;
         }
 
-        body.theme-whitewhite {
-            color: #111;
-        }
-        body.theme-whitewhite h1 {
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        body.theme-whitewhite .message {
-            color: #111;
-            background: rgba(255,255,255,0.8);
-        }
-        body.theme-whitewhite .player-badge {
-            background: rgba(255,255,255,0.6);
-            border: 2px solid #002366;
-            color: #111;
-        }
-        body.theme-whitewhite .p-bank {
-            color: #0b6623;
-        }
-        body.theme-whitewhite .p-bet {
-            color: #444;
-        }
-        body.theme-whitewhite .board-container {
-            background: rgba(255,255,255,0.5);
-            border: 2px solid #002366;
-        }
-        body.theme-whitewhite .local-player-area {
-            background: rgba(255,255,255,0.6);
-            border: 1px solid #002366;
-            color: #111;
-        }
-        body.theme-whitewhite .p-balance {
-            color: #0b6623;
-        }
-        body.theme-whitewhite .screen {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-        }
-        body.theme-whitewhite .screen input, body.theme-whitewhite .screen select {
-            background: #fff;
-            color: #111;
-            border: 1px solid #002366;
-        }
-        body.theme-whitewhite .dice-overlay {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-        }
-        body.theme-whitewhite .dice-overlay p, body.theme-whitewhite .dice-overlay h2 {
-            color: #111 !important;
-        }
-        body.theme-whitewhite .music-btn {
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #002366;
-            color: #002366;
-        }
-        
         h1 { margin: 15px 0 5px 0; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
         
         /* --- SCREENS --- */
@@ -140,7 +113,6 @@ Corrected Code
             text-align: center;
             min-width: 90px;
             transition: 0.3s;
-            position: relative;
         }
         .player-badge.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); background: rgba(212,175,55,0.1); transform: translateY(-2px);}
         .player-badge.folded { opacity: 0.35; filter: grayscale(1); }
@@ -205,7 +177,6 @@ Corrected Code
         /* --- POT & MESSAGES --- */
         .info-panel { text-align: center; height: 55px; }
         .pot { font-size: 26px; color: var(--gold); font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        body.theme-whitewhite .pot { color: #002366; text-shadow: none; }
         .message { font-size: 15px; margin-top: 3px; color: #fff; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 15px; display: inline-block;}
 
         /* --- LOCAL PLAYER AREA & BALANCE --- */
@@ -222,7 +193,6 @@ Corrected Code
             margin-bottom: 5px;
         }
         .section-label { font-size: 12px; font-weight: bold; color: var(--gold); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;}
-        body.theme-whitewhite .section-label { color: #002366; }
         .p-balance { font-size: 15px; color: #4caf50; font-weight: bold; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         .hand-container { display: flex; gap: 12px; margin-bottom: 10px; }
 
@@ -243,19 +213,9 @@ Corrected Code
 
         .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
 
-        /* --- MUSIC CONTROLS (SPLIT TOP LEFT & TOP RIGHT) --- */
-        .mute-control {
-            position: fixed;
-            top: 15px; 
-            left: 15px;
-            z-index: 100;
-        }
-        .track-control {
-            position: fixed;
-            top: 15px; 
-            right: 15px;
-            z-index: 100;
-        }
+        /* --- MUSIC CONTROLS --- */
+        .mute-control { position: fixed; top: 15px; left: 15px; z-index: 100; }
+        .track-control { position: fixed; top: 15px; right: 15px; z-index: 100; }
         .music-btn {
             background: rgba(0,0,0,0.8);
             border: 1px solid var(--gold);
@@ -287,50 +247,10 @@ Corrected Code
         .dice.rolling { animation: spinDice 0.25s infinite linear; color: #888; }
         .dice-btn { background: var(--gold); color: black; font-size: 20px; padding: 12px 30px;}
 
-        /* --- HATBOX (EMOJI ONLY) --- */
-        .hatbox-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid var(--gold);
-            border-radius: 12px;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 50;
-            display: none;
-            width: 140px;
-        }
-        .hatbox-title { color: var(--gold); font-size: 11px; text-transform: uppercase; text-align: center; margin: 0; letter-spacing: 1px;}
-        .emoji-grid { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
-        .emoji-btn { background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 5px; font-size: 18px; cursor: pointer; padding: 5px; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;}
-        .emoji-btn:hover { background: rgba(255,255,255,0.3); }
-        .emoji-input-row { display: flex; gap: 5px; }
-        .emoji-input { 
-            flex-grow: 1; width: 10px; background: #222; color: white; border: 1px solid #555; border-radius: 4px; font-size: 14px; text-align: center; padding: 2px;
-        }
-        .hatbox-send-btn { background: var(--gold); color: black; padding: 2px 6px; font-size: 10px; min-width: 40px;}
-        
-        .floating-emoji {
-            position: absolute;
-            font-size: 32px;
-            pointer-events: none;
-            animation: floatUp 2.5s ease-out forwards;
-            z-index: 100;
-        }
-        @keyframes floatUp {
-            0% { transform: translate(-50%, 0) scale(1); opacity: 1; }
-            100% { transform: translate(-50%, -120px) scale(1.8); opacity: 0; }
-        }
-
         @media (max-width: 600px) {
             .card { width: 60px; height: 90px; font-size: 22px; }
             .board-container { gap: 10px; padding: 8px 12px; }
             .local-player-area { padding: 8px 10px; }
-            .hatbox-container { bottom: 5px; right: 5px; padding: 6px; width: 120px; }
-            .emoji-btn { width: 30px; height: 30px; font-size: 14px; }
         }
     </style>
 </head>
@@ -338,13 +258,13 @@ Corrected Code
 
     <!-- Music Controls -->
     <div class="mute-control">
-        <button class="music-btn" id="mute-btn" onclick="toggleMute(event)">Mute</button>
+        <button class="music-btn" id="mute-btn" onclick="event.stopPropagation(); toggleMute()">Mute</button>
     </div>
     <div class="track-control">
-        <button class="music-btn" id="track-btn" onclick="cycleMusicSource(event)">MS</button>
+        <button class="music-btn" id="track-btn" onclick="event.stopPropagation(); cycleMusicSource()">MS</button>
     </div>
 
-    <!-- Hidden audio elements for local files -->
+    <!-- Hidden audio elements -->
     <audio id="Casablanca" src="ms1.mp3" loop></audio>
     <audio id="Perifida" src="ms2.mp3" loop></audio>
     <audio id="The Hall" src="ms3.mp3" loop></audio>
@@ -352,7 +272,7 @@ Corrected Code
 
     <!-- Setup / Lobby Screen -->
     <div class="screen" id="setup-screen">
-        <h1 style="font-size: 34px; color: var(--gold);">Dumb Poker</h1>
+        <h1 style="font-size: 34px;">Dumb Poker</h1>
         <p style="color: #aaa; margin-bottom: 15px;">True Multi-Device P2P Edition</p>
         
         <input type="text" id="player-name-input" placeholder="Your Name" maxlength="12" value="Player 1">
@@ -368,7 +288,7 @@ Corrected Code
 
     <!-- Waiting Lobby Screen -->
     <div class="screen" id="lobby-screen" style="display: none;">
-        <h1 style="color: var(--gold);">Game Lobby</h1>
+        <h1>Game Lobby</h1>
         <p>Room Code: <span id="display-room-code" style="color: var(--gold); font-size: 28px; font-weight: bold; letter-spacing: 2px;">----</span></p>
         
         <div id="host-theme-box" style="margin: 10px 0;">
@@ -386,7 +306,7 @@ Corrected Code
             </select>
         </div>
 
-        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; width: 280px; margin: 15px 0;">
+        <div style="background: rgba(0,0,0,0.05); padding: 12px; border-radius: 8px; width: 280px; margin: 15px 0; border: 1px solid rgba(128,128,128,0.2);">
             <h3 style="margin-top: 0; font-size: 15px;">Connected Players:</h3>
             <ul id="lobby-player-list" style="list-style: none; padding: 0; text-align: left; margin: 0; font-size: 14px;"></ul>
         </div>
@@ -412,7 +332,7 @@ Corrected Code
             <div class="message" id="message">Game starting...</div>
         </div>
 
-        <!-- Permanent Local Pocket Cards & Controls -->
+        <!-- Local Area -->
         <div class="local-player-area">
             <div class="section-label" id="turn-status-label">Your Pocket Cards</div>
             <div class="p-balance" id="local-balance">Balance: $130</div>
@@ -437,32 +357,14 @@ Corrected Code
         <button class="btn-deal" id="btn-deal" onclick="hostNextRound()">Deal Next Round</button>
     </div>
 
-    <!-- Dice Roll Tiebreaker -->
+    <!-- Dice Roll -->
     <div class="dice-overlay" id="dice-overlay">
-        <h2 style="color: var(--gold); font-size: 32px; margin-bottom: 0;">SUDDEN DEATH TIE!</h2>
-        <p style="color: white; margin-top: 4px;">Highest roll takes the pot.</p>
+        <h2 style="font-size: 32px; margin-bottom: 0;">SUDDEN DEATH TIE!</h2>
+        <p style="margin-top: 4px;">Highest roll takes the pot.</p>
         <div class="dice-arena" id="dice-arena"></div>
         <button class="dice-btn" id="btn-roll" onclick="hostRollDice()" style="display:none;">ROLL DICE</button>
-        <h2 id="dice-result" style="color: white; font-size: 22px; text-align: center; height: 25px;"></h2>
+        <h2 id="dice-result" style="font-size: 22px; text-align: center; height: 25px;"></h2>
         <button id="btn-close-dice" style="display:none; margin-top:15px; background: white; color: black;" onclick="requestCloseDice()">Collect Pot</button>
-    </div>
-
-    <!-- Hatbox (Emoji Chat) -->
-    <div class="hatbox-container" id="hatbox-container">
-        <h4 class="hatbox-title">Hatbox</h4>
-        <div class="emoji-grid">
-            <button class="emoji-btn" onclick="sendEmoji('😎')">😎</button>
-            <button class="emoji-btn" onclick="sendEmoji('🤬')">🤬</button>
-            <button class="emoji-btn" onclick="sendEmoji('🤑')">🤑</button>
-            <button class="emoji-btn" onclick="sendEmoji('💀')">💀</button>
-            <button class="emoji-btn" onclick="sendEmoji('🍻')">🍻</button>
-            <button class="emoji-btn" onclick="sendEmoji('🤡')">🤡</button>
-        </div>
-        <div class="emoji-input-row">
-            <!-- Fixed Regex: Strips standard ASCII (letters/numbers/punctuation) leaving mostly extended chars/emojis without breaking HTML attribute -->
-            <input type="text" id="emoji-input" class="emoji-input" placeholder="Drop Emoji..." oninput="this.value = this.value.replace(/[\x00-\x7F]/g, '')">
-            <button class="hatbox-send-btn" onclick="sendCustomEmoji()">Drop</button>
-        </div>
     </div>
 
 <script>
@@ -478,7 +380,7 @@ Corrected Code
     }
 
     let jazzPlaying = false;
-    let musicMode = 0; // 0: MS, 1: Casablanca, 2: Perifida, 3: The Hall
+    let musicMode = 0; 
     let isMuted = false;
 
     function stopAllAudio() {
@@ -502,8 +404,7 @@ Corrected Code
         }
     }
 
-    function toggleMute(e) {
-        if(e) e.stopPropagation();
+    function toggleMute() {
         isMuted = !isMuted;
         let btn = document.getElementById('mute-btn');
         if (btn) btn.innerText = isMuted ? "Unmute" : "Mute";
@@ -517,8 +418,7 @@ Corrected Code
         }
     }
 
-    function cycleMusicSource(e) {
-        if(e) e.stopPropagation();
+    function cycleMusicSource() {
         musicMode = (musicMode + 1) % 4;
         let btnText = "MS";
         if (musicMode === 1) btnText = "Casablanca";
@@ -527,6 +427,7 @@ Corrected Code
         
         let trackBtn = document.getElementById('track-btn');
         if (trackBtn) trackBtn.innerText = btnText;
+        else if (event && event.target) event.target.innerText = btnText;
 
         playActiveMusic();
     }
@@ -682,56 +583,10 @@ Corrected Code
         peer.on('connection', (conn) => {
             clientConnections.push(conn);
             conn.on('data', (data) => handleHostIncomingData(data, conn));
-            
-            // DISCONNECTION HANDLER (HOST SIDE)
             conn.on('close', () => {
-                let pIndex = gameState.players.findIndex(p => p.id === conn.peer);
-                if (pIndex !== -1) {
-                    let p = gameState.players[pIndex];
-                    
-                    if (gameState.state > 0 || el('table-section').style.display === 'flex') {
-                        msg(`${p.name} disconnected.`);
-                        let wasTheirTurn = (gameState.turnIndex === pIndex);
-                        
-                        // Remove them from game state completely
-                        gameState.players.splice(pIndex, 1);
-                        
-                        // Adjust turn index safely
-                        if (gameState.turnIndex >= gameState.players.length) {
-                            gameState.turnIndex = 0;
-                        } else if (pIndex < gameState.turnIndex) {
-                            gameState.turnIndex--;
-                        }
-
-                        let activePlayers = gameState.players.filter(pl => !pl.folded);
-                        
-                        if (activePlayers.length === 1) {
-                            activePlayers[0].bank += gameState.pot;
-                            endGameHost(`${activePlayers[0].name} wins! Everyone else folded.`);
-                        } else if (activePlayers.length === 0) {
-                            endGameHost("Everyone folded. House wins!");
-                        } else {
-                            let roundOver = activePlayers.every(pl => pl.hasActed && pl.currentBet === gameState.currentHighestBet);
-                            if (roundOver) {
-                                advanceHostPhase();
-                            } else {
-                                if (wasTheirTurn) {
-                                    // Make sure the new active index isn't pointing to a folded player
-                                    while (gameState.players.length > 0 && gameState.players[gameState.turnIndex] && gameState.players[gameState.turnIndex].folded) {
-                                        gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
-                                    }
-                                }
-                                broadcastGameState();
-                            }
-                        }
-                    } else {
-                        // Just remove them if we are in the lobby
-                        gameState.players.splice(pIndex, 1);
-                        updateLobbyUI();
-                        broadcastLobby();
-                    }
-                }
-                clientConnections = clientConnections.filter(c => c.peer !== conn.peer);
+                gameState.players = gameState.players.filter(p => p.id !== conn.peer);
+                updateLobbyUI();
+                broadcastLobby();
             });
         });
     }
@@ -767,19 +622,13 @@ Corrected Code
             });
 
             hostConnection.on('data', (data) => handleClientIncomingData(data));
-            
-            // DISCONNECTION HANDLER (CLIENT SIDE)
-            hostConnection.on('close', () => {
-                alert("Disconnected from Host. The game has ended.");
-                location.reload();
-            });
         });
     }
 
     function updateLobbyUI() {
         let listHtml = '';
         gameState.players.forEach(p => {
-            listHtml += `<li style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">👤 ${p.name}</li>`;
+            listHtml += `<li style="padding: 4px 0;">👤 ${p.name}</li>`;
         });
         el('lobby-player-list').innerHTML = listHtml;
         if (isHost) {
@@ -803,9 +652,6 @@ Corrected Code
             processPlayerAction(conn.peer, data.action, data.amount);
         } else if (data.type === 'CLOSE_DICE_REQUEST') {
             hostCloseDice();
-        } else if (data.type === 'EMOJI') {
-            // Rebroadcast emoji to all clients and self
-            broadcastEmoji(data.id, data.emoji);
         }
     }
 
@@ -817,7 +663,6 @@ Corrected Code
         } else if (data.type === 'GAME_START' || data.type === 'STATE_UPDATE') {
             el('lobby-screen').style.display = 'none';
             el('table-section').style.display = 'flex';
-            el('hatbox-container').style.display = 'flex'; // Show Hatbox when game is active
             gameState = data.gameState;
             changeThemeLocally(gameState.theme);
             if (gameState.message) {
@@ -832,8 +677,6 @@ Corrected Code
             el('dice-overlay').style.display = 'none';
         } else if (data.type === 'REFRESH') {
             location.reload();
-        } else if (data.type === 'SHOW_EMOJI') {
-            showFloatingEmoji(data.senderId, data.emoji);
         }
     }
 
@@ -841,7 +684,6 @@ Corrected Code
         if (!isHost) return;
         el('lobby-screen').style.display = 'none';
         el('table-section').style.display = 'flex';
-        el('hatbox-container').style.display = 'flex'; // Show Hatbox for Host
         gameState.deck = buildDeck();
         hostNextRound();
     }
@@ -886,7 +728,7 @@ Corrected Code
 
     function processPlayerAction(peerId, action, amount) {
         let p = gameState.players[gameState.turnIndex];
-        if (!p || p.id !== peerId) return;
+        if (p.id !== peerId) return;
 
         if (action === 'fold') {
             sfx.fold();
@@ -944,10 +786,6 @@ Corrected Code
             endGameHost(`${activePlayers[0].name} wins! Everyone else folded.`);
             return;
         }
-        if (activePlayers.length === 0) {
-            endGameHost("Everyone folded. House wins!");
-            return;
-        }
 
         let roundOver = activePlayers.every(p => p.hasActed && p.currentBet === gameState.currentHighestBet);
 
@@ -956,7 +794,7 @@ Corrected Code
         } else {
             do {
                 gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
-            } while (gameState.players[gameState.turnIndex] && gameState.players[gameState.turnIndex].folded);
+            } while (gameState.players[gameState.turnIndex].folded);
             broadcastGameState();
         }
     }
@@ -1091,7 +929,7 @@ Corrected Code
                 }
             }
 
-            trackerHtml += `<div class="${classes}" id="badge-${p.id}">
+            trackerHtml += `<div class="${classes}">
                 <div class="p-bank">$${p.bank}</div>
                 <div class="p-bet">${betText}</div>
                 ${miniCardsHtml}
@@ -1148,7 +986,7 @@ Corrected Code
         tiedPlayers.forEach(p => {
             let initialNum = Math.floor(Math.random() * 6) + 1;
             arena.innerHTML += `<div class="dice-box">
-                <h3 style="color:var(--gold); margin:4px 0;">${p.name}</h3>
+                <h3 style="margin:4px 0;">${p.name}</h3>
                 <div class="dice rolling" id="dice-${p.id}">${initialNum}</div>
             </div>`;
         });
@@ -1218,59 +1056,6 @@ Corrected Code
         clientConnections.forEach(conn => conn.send({ type: 'CLOSE_DICE' }));
         el('dice-overlay').style.display = 'none';
         endGameHost("Chaos concluded.");
-    }
-
-    /* --- HATBOX & EMOJI LOGIC --- */
-    function sendEmoji(emojiChar) {
-        if (!emojiChar || emojiChar.trim() === '') return;
-        
-        if (isHost) {
-            broadcastEmoji(myId, emojiChar);
-        } else if (hostConnection) {
-            hostConnection.send({ type: 'EMOJI', id: myId, emoji: emojiChar });
-        }
-    }
-
-    function sendCustomEmoji() {
-        let inputEl = el('emoji-input');
-        let val = inputEl.value;
-        if (val) {
-            sendEmoji(val);
-            inputEl.value = '';
-        }
-    }
-
-    function broadcastEmoji(senderId, emojiChar) {
-        // Show it locally on Host
-        showFloatingEmoji(senderId, emojiChar);
-        // Dispatch to all connected clients
-        clientConnections.forEach(conn => {
-            conn.send({ type: 'SHOW_EMOJI', senderId: senderId, emoji: emojiChar });
-        });
-    }
-
-    function showFloatingEmoji(senderId, emojiChar) {
-        let floatingEl = document.createElement('div');
-        floatingEl.className = 'floating-emoji';
-        floatingEl.innerText = emojiChar;
-
-        let targetBadge = el(`badge-${senderId}`);
-        if (targetBadge) {
-            floatingEl.style.top = '0px';
-            floatingEl.style.left = '50%';
-            targetBadge.appendChild(floatingEl);
-        } else {
-            // Fallback to center screen if badge isn't found
-            floatingEl.style.top = '50%';
-            floatingEl.style.left = '50%';
-            document.body.appendChild(floatingEl);
-        }
-
-        setTimeout(() => {
-            if (floatingEl.parentNode) {
-                floatingEl.parentNode.removeChild(floatingEl);
-            }
-        }, 2500);
     }
 </script>
 </body>
