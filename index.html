@@ -240,7 +240,6 @@
         
         .btn-call { background: #1976d2; font-size: 14px; padding: 10px 24px;}
         .btn-fold { background: #d32f2f; }
-        .btn-loan { background: #ff9800; color: black; font-size: 11px; padding: 5px 10px;}
         .btn-deal { background: #2e7d32; font-size: 16px; padding: 12px 30px; display: none; margin-bottom: 5px;}
 
         .chip { border-radius: 30px; padding: 7px 12px; border: 2px dashed rgba(255,255,255,0.3); font-size: 13px; background: #388e3c;}
@@ -314,7 +313,7 @@
             <label style="font-size: 13px; color: #aaa;">Choose a Game:</label><br>
             <select id="game-type-select">
                 <option value="xing">Xing</option>
-                <option value="poker">Dumb Poker</option>
+                <option value="poker">Dumb Cards (Poker)</option>
             </select>
         </div>
         
@@ -325,11 +324,34 @@
             <br>
             <button onclick="joinGame()" style="background: #1976d2;">Join Game</button>
         </div>
+
+        <div style="margin: 10px 0; color: #666;">- OR -</div>
+
+        <div style="margin-top: 5px; border-top: 1px solid #333; padding-top: 15px; width: 260px;">
+            <p style="color: #aaa; font-size: 13px; margin: 0 0 8px 0;">Play Solo vs Bots</p>
+            <label style="font-size: 13px; color: #aaa;">Bot Difficulty:</label><br>
+            <select id="bot-difficulty-select">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard (AI)</option>
+            </select>
+            <br>
+            <label style="font-size: 13px; color: #aaa;">Number of Bots:</label><br>
+            <select id="bot-count-select">
+                <option value="1">1</option>
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+            <br>
+            <button onclick="startSoloGame()" style="background: #9c27b0;">Play Solo vs Bots</button>
+        </div>
     </div>
 
     <!-- Waiting Lobby Screen -->
     <div class="screen" id="lobby-screen" style="display: none;">
-        <h1>Table Room</h1>
+        <h1>Game Lobby</h1>
         <p>Room Code: <span id="display-room-code" style="color: var(--gold); font-size: 28px; font-weight: bold; letter-spacing: 2px;">----</span></p>
         <p style="color: #aaa; font-size: 13px;">Game: <span id="display-game-mode" style="color: var(--gold); font-weight: bold;">Xing</span></p>
         
@@ -357,7 +379,7 @@
         <p id="guest-waiting-text" style="color: #aaa; font-size: 13px;">Waiting for host to start...</p>
     </div>
 
-    <h1 id="game-title">Dumb Poker</h1>
+    <h1 id="game-title">Dumb Cards</h1>
 
     <!-- ===================== DUMB CARDS (POKER) TABLE ===================== -->
     <div class="table-section" id="table-section-poker">
@@ -394,7 +416,6 @@
                     <button class="chip" onclick="pokerSendAction('raise', 50)">$50</button>
                 </div>
             </div>
-            <button class="btn-loan" onclick="pokerSendAction('loan')" style="margin-top: 6px;">Take Bank Loan (+$100)</button>
         </div>
         
         <button class="btn-deal" id="btn-deal-poker" onclick="hostNextRound()">Deal Next Round</button>
@@ -583,6 +604,18 @@
     };
 
     /* ============================================================
+       GROQ API CONFIGURATION (used for "Hard" difficulty bots)
+       Paste your own Groq API key below to let Hard bots make their
+       decisions with an LLM. Get a free key at
+       https://console.groq.com/keys
+       If left as-is (or the request fails for any reason), Hard bots
+       automatically fall back to the same built-in heuristic logic
+       used by Medium bots, so the game still works without a key.
+       ============================================================ */
+    const GROQ_API_KEY = "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";
+    const GROQ_MODEL = "llama-3.3-70b-versatile";
+
+    /* ============================================================
        SHARED STATE & CONNECTION LAYER
        One room code / one PeerJS namespace for both games. The host
        picks the game on the setup screen; guests just join the code
@@ -598,6 +631,17 @@
     
     let hostConnection = null;
     let clientConnections = [];
+
+    // --- Singleplayer / bot state ---
+    let isSinglePlayer = false;
+    let botDifficulty = "medium";
+    const BOT_NAME_POOL = ["Ace", "Rex", "Nova", "Diesel", "Sable", "Kiwi", "Bandit", "Otto", "Ziggy", "Luna", "Duke", "Nash"];
+
+    function pickBotName(usedNames) {
+        let available = BOT_NAME_POOL.filter(n => !usedNames.includes(n));
+        let pool = available.length > 0 ? available : BOT_NAME_POOL;
+        return pool[Math.floor(Math.random() * pool.length)] + " 🤖";
+    }
 
     let gameState = {
         gameType: 'xing',      // 'xing' or 'poker'
@@ -649,11 +693,75 @@
         el('game-title').innerText = gameLabel(gameState.gameType);
     }
 
-    function createPlayerObj(id, name) {
+    function createPlayerObj(id, name, isBot = false) {
+        // Each bot gets its own personality so bots of the same difficulty
+        // don't all play identically - aggression pushes toward raising/
+        // spending Jacks earlier, tightness pushes toward folding/caution.
+        let personality = isBot ? { aggression: Math.random(), tightness: Math.random() } : {};
         if (gameState.gameType === 'poker') {
-            return { id: id, name: name, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false };
+            return { id: id, name: name, bank: 130, cards: [], folded: false, currentBet: 0, hasActed: false, isOut: false, isBot: isBot, ...personality };
         }
-        return { id: id, name: name, cards: [], score: 0, collectedCards: 0, xings: 0, jackXings: 0 };
+        return { id: id, name: name, cards: [], score: 0, collectedCards: 0, xings: 0, jackXings: 0, isBot: isBot, ...personality };
+    }
+
+    function startSoloGame() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        myName = el('player-name-input').value.trim() || "Player 1";
+        gameState.gameType = el('game-type-select').value;
+        let botCount = parseInt(el('bot-count-select').value, 10) || 2;
+        botDifficulty = el('bot-difficulty-select').value;
+
+        isSinglePlayer = true;
+        isHost = true;
+        myId = 'local-player';
+        roomCode = 'SOLO';
+        peer = null;
+        hostConnection = null;
+        clientConnections = [];
+
+        gameState = {
+            gameType: gameState.gameType,
+            players: [],
+            deck: [],
+            board: [],
+            boardStack: [],
+            state: 0,
+            pot: 0,
+            currentHighestBet: 0,
+            turnIndex: 0,
+            lastCapturePlayerId: null,
+            theme: currentTheme,
+            message: "Game starting...",
+            gameOver: false,
+            started: false
+        };
+
+        gameState.players.push(createPlayerObj(myId, myName, false));
+        let usedNames = [myName];
+        for (let i = 0; i < botCount; i++) {
+            let bname = pickBotName(usedNames);
+            usedNames.push(bname);
+            gameState.players.push(createPlayerObj('bot-' + i, bname, true));
+        }
+
+        el('setup-screen').style.display = 'none';
+        el('lobby-screen').style.display = 'none';
+        gameState.started = true;
+        showActiveTableSection();
+
+        if (gameState.gameType === 'poker') {
+            gameState.deck = pokerBuildDeck();
+            hostNextRound();
+        } else {
+            gameState.players.forEach(p => {
+                p.score = 0;
+                p.collectedCards = 0;
+                p.xings = 0;
+                p.jackXings = 0;
+            });
+            gameState.gameOver = false;
+            hostStartNewDeck();
+        }
     }
 
     function hostGame() {
@@ -827,6 +935,330 @@
             conn.send({ type: 'STATE_UPDATE', gameState: gameState });
         });
         renderClientTable();
+        maybeTriggerBotTurn();
+    }
+
+    /* ============================================================
+       BOT AI (singleplayer mode)
+       ============================================================ */
+
+    function maybeTriggerBotTurn() {
+        if (!isSinglePlayer || !isHost) return;
+
+        if (gameState.gameType === 'poker') {
+            if (gameState.state >= 6) return;
+            let p = gameState.players[gameState.turnIndex];
+            if (p && p.isBot && !p.folded) {
+                let expectedId = p.id;
+                setTimeout(() => {
+                    let current = gameState.players[gameState.turnIndex];
+                    if (current && current.id === expectedId && !current.folded && gameState.state < 6) {
+                        runBotPokerTurn(current);
+                    }
+                }, 700 + Math.random() * 700);
+            }
+        } else {
+            if (gameState.gameOver) return;
+            let p = gameState.players[gameState.turnIndex];
+            if (p && p.isBot && p.cards.length > 0) {
+                let expectedId = p.id;
+                setTimeout(() => {
+                    let current = gameState.players[gameState.turnIndex];
+                    if (current && current.id === expectedId && current.cards.length > 0 && !gameState.gameOver) {
+                        runBotXingTurn(current);
+                    }
+                }, 700 + Math.random() * 700);
+            }
+        }
+    }
+
+    const CHIP_VALUES = [5, 10, 15, 25, 50];
+
+    function pickRaiseTarget(p) {
+        let options = CHIP_VALUES.filter(v => v > gameState.currentHighestBet && v <= (p.bank + p.currentBet));
+        if (options.length === 0) return null;
+        return options[Math.floor(Math.random() * options.length)];
+    }
+
+    function botHandStrength(p) {
+        let visibleCount = gameState.state; // 0, 3, 4, or 5
+        let visibleBoard = gameState.board.slice(0, visibleCount);
+        let matches = 0, highestMatchRank = -1;
+        p.cards.forEach(c => {
+            visibleBoard.forEach(bc => {
+                if (c.value === bc.value) {
+                    matches++;
+                    if (c.rank > highestMatchRank) highestMatchRank = c.rank;
+                }
+            });
+        });
+        let holePair = p.cards[0].value === p.cards[1].value;
+        let maxHoleRank = Math.max(p.cards[0].rank, p.cards[1].rank);
+        return matches * 30 + (holePair ? 25 : 0) + maxHoleRank * 2;
+    }
+
+    // EASY: genuinely weak and beatable. Folds to real pressure fairly often
+    // and rarely raises - not an unkillable calling-station.
+    function decideEasyPokerAction(p) {
+        let callAmount = gameState.currentHighestBet - p.currentBet;
+        if (callAmount > p.bank) return { action: 'fold' }; // can't cover it, no loans left
+
+        let r = Math.random();
+        if (callAmount > 0) {
+            if (r < 0.35) return { action: 'fold' };
+            if (r < 0.45) {
+                let target = pickRaiseTarget(p);
+                if (target) return { action: 'raise', amount: target };
+            }
+            return { action: 'call' };
+        }
+        if (r < 0.15) {
+            let target = pickRaiseTarget(p);
+            if (target) return { action: 'raise', amount: target };
+        }
+        return { action: 'call' };
+    }
+
+    // MEDIUM: reads hand strength like before, but each bot has its own
+    // aggression/tightness personality plus per-decision noise, and will
+    // occasionally bluff or slow-play - so it's no longer a fixed formula
+    // that always does the same thing with the same hand.
+    function decidePokerBotAction(p) {
+        let callAmount = gameState.currentHighestBet - p.currentBet;
+        let aggression = p.aggression != null ? p.aggression : 0.5;
+        let tightness = p.tightness != null ? p.tightness : 0.5;
+
+        if (callAmount > p.bank) return { action: 'fold' }; // can't cover it, no loans left
+
+        let strength = botHandStrength(p) + (Math.random() - 0.5) * 30; // +/-15 noise
+        let foldThreshold = 8 + tightness * 22;      // ~8-30
+        let raiseThreshold = 38 + (1 - aggression) * 30; // ~38-68
+
+        // Rare bluff: raise anyway despite a weak-looking hand
+        if (strength < foldThreshold && Math.random() < 0.10 + aggression * 0.10) {
+            let target = pickRaiseTarget(p);
+            if (target) return { action: 'raise', amount: target };
+        }
+        if (strength < foldThreshold && callAmount > 0 && Math.random() < 0.55) {
+            return { action: 'fold' };
+        }
+        if (strength > raiseThreshold && Math.random() < 0.35 + aggression * 0.35) {
+            let target = pickRaiseTarget(p);
+            if (target) return { action: 'raise', amount: target };
+        }
+        return { action: 'call' };
+    }
+
+    // HARD fallback (used when no Groq key is set, or the API call fails):
+    // reasons about pot odds instead of fixed strength cutoffs, so it plays
+    // meaningfully differently from Medium rather than collapsing into it.
+    function decideHardPokerFallback(p) {
+        let callAmount = gameState.currentHighestBet - p.currentBet;
+        if (callAmount > p.bank) return { action: 'fold' }; // can't cover it, no loans left
+
+        let strength = botHandStrength(p);
+        let winProb = Math.min(0.95, Math.max(0.05, strength / 110));
+        let potOdds = callAmount > 0 ? callAmount / (gameState.pot + callAmount) : 0;
+
+        if (callAmount > 0 && winProb < potOdds - 0.05) {
+            // Cheap, low-risk bluff when the price to stay in is small relative to bank
+            if (callAmount < p.bank * 0.12 && Math.random() < 0.15) {
+                let target = pickRaiseTarget(p);
+                if (target) return { action: 'raise', amount: target };
+            }
+            return { action: 'fold' };
+        }
+        if (winProb > 0.6 && Math.random() < 0.65) {
+            let target = pickRaiseTarget(p);
+            if (target) return { action: 'raise', amount: target };
+        }
+        return { action: 'call' };
+    }
+
+    async function decideHardPokerAction(p) {
+        let fallback = decideHardPokerFallback(p);
+        if (!GROQ_API_KEY || GROQ_API_KEY.indexOf('YOUR_') === 0) return fallback;
+
+        try {
+            let visibleBoard = gameState.board.slice(0, gameState.state).map(c => c.value + c.suit).join(' ') || 'none yet';
+            let callAmount = gameState.currentHighestBet - p.currentBet;
+            let prompt = `You're playing a simplified poker-style card game called "Dumb Cards". Your hole cards: ${p.cards.map(c => c.value + c.suit).join(' ')}. Visible community cards: ${visibleBoard}. Pot: $${gameState.pot}. Your bank: $${p.bank}. Amount needed to call: $${callAmount}. Weigh your hand strength against the pot odds (how much you'd risk vs. the pot), and don't be afraid to fold weak hands or raise strong ones - avoid just calling by default. Reply with exactly one word: FOLD, CALL, or RAISE.`;
+
+            let resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + GROQ_API_KEY },
+                body: JSON.stringify({
+                    model: GROQ_MODEL,
+                    messages: [{ role: "user", content: prompt }],
+                    max_tokens: 6,
+                    temperature: 0.8
+                })
+            });
+            let data = await resp.json();
+            let text = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').toUpperCase();
+
+            if (text.includes('FOLD') && callAmount > 0) return { action: 'fold' };
+            if (text.includes('RAISE')) {
+                let target = pickRaiseTarget(p);
+                if (target) return { action: 'raise', amount: target };
+                return { action: 'call' };
+            }
+            if (text.includes('CALL')) return { action: 'call' };
+            return fallback;
+        } catch (e) {
+            console.log('Groq API call failed, using fallback bot logic:', e);
+            return fallback;
+        }
+    }
+
+    async function runBotPokerTurn(p) {
+        if (!isSinglePlayer || !isHost) return;
+        if (gameState.gameOver || gameState.state >= 6) return;
+        let current = gameState.players[gameState.turnIndex];
+        if (!current || current.id !== p.id || current.folded) return;
+
+        let decision;
+        if (botDifficulty === 'hard') decision = await decideHardPokerAction(p);
+        else if (botDifficulty === 'easy') decision = decideEasyPokerAction(p);
+        else decision = decidePokerBotAction(p);
+
+        // Re-check the turn is still valid after any await (state may have changed)
+        current = gameState.players[gameState.turnIndex];
+        if (!current || current.id !== p.id || current.folded) return;
+
+        if (decision.action === 'raise') {
+            let target = decision.amount;
+            if (target <= gameState.currentHighestBet) {
+                pokerProcessPlayerAction(p.id, 'call');
+            } else {
+                pokerProcessPlayerAction(p.id, 'raise', target);
+            }
+        } else {
+            pokerProcessPlayerAction(p.id, decision.action);
+        }
+    }
+
+    function xingBestCaptureIndex(p, aggression = 0.5) {
+        let topCard = gameState.boardStack.length > 0 ? gameState.boardStack[gameState.boardStack.length - 1] : null;
+        if (!topCard) return -1;
+
+        // Prefer a direct value match over spending a Jack.
+        let matchIdx = p.cards.findIndex(c => c.value === topCard.value && c.value !== 'J');
+        if (matchIdx !== -1) return matchIdx;
+
+        let jackIdx = p.cards.findIndex(c => c.value === 'J');
+        if (jackIdx !== -1) {
+            // More aggressive bots are willing to spend a Jack on a smaller pile;
+            // cautious ones hold out for a bigger sweep (or a Jack-on-Jack xing).
+            let pileThreshold = aggression > 0.66 ? 1 : (aggression > 0.33 ? 2 : 3);
+            if (gameState.boardStack.length >= pileThreshold || topCard.value === 'J') return jackIdx;
+        }
+        return -1;
+    }
+
+    // EASY: mostly plays randomly and only sometimes takes an obvious capture,
+    // so it wastes Jacks and misses sweeps - genuinely weak, not just unpredictable.
+    function decideEasyXingCardIndex(p) {
+        let captureIdx = xingBestCaptureIndex(p, 1);
+        if (captureIdx !== -1 && Math.random() < 0.35) return captureIdx;
+        return Math.floor(Math.random() * p.cards.length);
+    }
+
+    // MEDIUM: reliably takes good captures, but personality affects Jack timing
+    // and the discard choice is picked from a couple of similar options instead
+    // of always the single lowest card, so it isn't 100% deterministic.
+    function decideMediumXingCardIndex(p) {
+        let aggression = p.aggression != null ? p.aggression : 0.5;
+        let idx = xingBestCaptureIndex(p, aggression);
+        if (idx !== -1) return idx;
+
+        let nonJack = p.cards.map((c, i) => ({ c, i })).filter(o => o.c.value !== 'J');
+        let pool = nonJack.length > 0 ? nonJack : p.cards.map((c, i) => ({ c, i }));
+        pool.sort((a, b) => getRank(a.c.value) - getRank(b.c.value));
+        let choices = pool.slice(0, Math.min(2, pool.length));
+        return choices[Math.floor(Math.random() * choices.length)].i;
+    }
+
+    function decideXingBotCardIndex(p, difficulty) {
+        if (p.cards.length === 0) return -1;
+        if (difficulty === 'easy') return decideEasyXingCardIndex(p);
+        return decideMediumXingCardIndex(p);
+    }
+
+    // HARD fallback: counts how many copies of each value are already visible
+    // on the pile, so when it can't capture it discards defensively - the value
+    // least likely to still be dangerous - rather than just the lowest rank.
+    function decideHardXingFallback(p) {
+        let topCard = gameState.boardStack.length > 0 ? gameState.boardStack[gameState.boardStack.length - 1] : null;
+
+        if (topCard) {
+            let matchIdx = p.cards.findIndex(c => c.value === topCard.value && c.value !== 'J');
+            if (matchIdx !== -1) return matchIdx;
+
+            let jackIdx = p.cards.findIndex(c => c.value === 'J');
+            if (jackIdx !== -1 && (gameState.boardStack.length >= 2 || topCard.value === 'J')) return jackIdx;
+        }
+
+        let seenCount = {};
+        gameState.boardStack.forEach(c => { seenCount[c.value] = (seenCount[c.value] || 0) + 1; });
+
+        let nonJack = p.cards.map((c, i) => ({ c, i })).filter(o => o.c.value !== 'J');
+        let pool = nonJack.length > 0 ? nonJack : p.cards.map((c, i) => ({ c, i }));
+        pool.sort((a, b) => {
+            let seenDiff = (seenCount[b.c.value] || 0) - (seenCount[a.c.value] || 0);
+            if (seenDiff !== 0) return seenDiff; // discard the value already most exposed on the pile
+            return getRank(a.c.value) - getRank(b.c.value);
+        });
+        return pool[0].i;
+    }
+
+    async function decideHardXingCardIndex(p) {
+        let fallback = decideHardXingFallback(p);
+        if (!GROQ_API_KEY || GROQ_API_KEY.indexOf('YOUR_') === 0) return fallback;
+
+        try {
+            let topCard = gameState.boardStack.length > 0 ? gameState.boardStack[gameState.boardStack.length - 1] : null;
+            let handDesc = p.cards.map((c, i) => `${i}:${c.value}${c.suit}`).join(', ');
+            let prompt = `You're playing the card game "Xing". The pile's top card is ${topCard ? topCard.value + topCard.suit : 'empty'}, and the pile has ${gameState.boardStack.length} card(s) in it. Your hand: ${handDesc}. Playing a card that matches the top card's value, or playing a Jack, captures the whole pile. Jacks are valuable, so save them for bigger piles when possible; if you can't capture, discard whatever is least useful to hold onto. Reply with ONLY the index number (0-${p.cards.length - 1}) of the card you want to play, nothing else.`;
+
+            let resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + GROQ_API_KEY },
+                body: JSON.stringify({
+                    model: GROQ_MODEL,
+                    messages: [{ role: "user", content: prompt }],
+                    max_tokens: 5,
+                    temperature: 0.7
+                })
+            });
+            let data = await resp.json();
+            let text = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+            let match = text.match(/\d+/);
+            let idx = match ? parseInt(match[0], 10) : NaN;
+            if (!isNaN(idx) && idx >= 0 && idx < p.cards.length) return idx;
+            return fallback;
+        } catch (e) {
+            console.log('Groq API call failed, using fallback bot logic:', e);
+            return fallback;
+        }
+    }
+
+    async function runBotXingTurn(p) {
+        if (!isSinglePlayer || !isHost) return;
+        if (gameState.gameOver) return;
+        let current = gameState.players[gameState.turnIndex];
+        if (!current || current.id !== p.id || current.cards.length === 0) return;
+
+        let idx;
+        if (botDifficulty === 'hard') idx = await decideHardXingCardIndex(p);
+        else idx = decideXingBotCardIndex(p, botDifficulty);
+
+        // Re-check the turn is still valid after any await
+        current = gameState.players[gameState.turnIndex];
+        if (!current || current.id !== p.id || current.cards.length === 0) return;
+        if (idx < 0 || idx >= current.cards.length) idx = 0;
+
+        xingProcessPlayerAction(p.id, idx);
     }
 
     function renderClientTable() {
@@ -868,19 +1300,37 @@
             return;
         }
 
+        // Players who went broke sit out for the rest of this deck instead of
+        // being dealt back in - once the deck runs out the game refreshes and
+        // everyone starts even again.
+        let solventPlayers = gameState.players.filter(p => !p.isOut);
+        if (solventPlayers.length < 2) {
+            msg("Not enough players left with money! Refreshing game...");
+            clientConnections.forEach(conn => conn.send({ type: 'REFRESH' }));
+            setTimeout(() => location.reload(), 1500);
+            return;
+        }
+
         sfx.flip();
         gameState.pot = 0;
         gameState.state = 0;
         gameState.currentHighestBet = 0;
-        gameState.turnIndex = 0;
 
         gameState.players.forEach(p => {
+            if (p.isOut) {
+                p.cards = [];
+                p.folded = true;
+                p.currentBet = 0;
+                p.hasActed = true;
+                return;
+            }
             p.cards = [gameState.deck.pop(), gameState.deck.pop()];
             p.folded = false;
             p.currentBet = 0;
             p.hasActed = false;
         });
         gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
+        gameState.turnIndex = gameState.players.findIndex(p => !p.folded);
 
         broadcastGameState("Pre-Flop: Pass or Bet.");
     }
@@ -896,6 +1346,15 @@
             msg(`${p.name} folded.`);
         } else if (action === 'call') {
             let callAmount = gameState.currentHighestBet - p.currentBet;
+            if (callAmount > p.bank) {
+                // No loans anymore - can't cover it, so it's a forced fold.
+                sfx.fold();
+                p.folded = true;
+                p.hasActed = true;
+                msg(`${p.name} can't cover the bet and folds.`);
+                advanceHostTurn();
+                return;
+            }
             if (callAmount > 0) {
                 p.bank -= callAmount;
                 p.currentBet += callAmount;
@@ -909,6 +1368,30 @@
             p.hasActed = true;
         } else if (action === 'raise') {
             let targetBet = Math.max(amount, gameState.currentHighestBet);
+            let maxAffordable = p.bank + p.currentBet;
+
+            if (targetBet > maxAffordable) {
+                // Can't afford the raise - fall back to a call if that's still
+                // affordable, otherwise it's a forced fold. No more loans.
+                if (maxAffordable >= gameState.currentHighestBet) {
+                    let callAmount = gameState.currentHighestBet - p.currentBet;
+                    p.bank -= callAmount;
+                    p.currentBet += callAmount;
+                    gameState.pot += callAmount;
+                    p.hasActed = true;
+                    sfx.chip();
+                    msg(`${p.name} couldn't afford to raise and matched instead.`);
+                } else {
+                    sfx.fold();
+                    p.folded = true;
+                    p.hasActed = true;
+                    msg(`${p.name} can't cover the bet and folds.`);
+                }
+                if (p.bank <= 0) { p.bank = 0; p.isOut = true; }
+                advanceHostTurn();
+                return;
+            }
+
             let cost = targetBet - p.currentBet;
             if (cost < 0) cost = 0;
             
@@ -927,12 +1410,13 @@
             p.hasActed = true;
             sfx.chip();
             msg(`${p.name} raised to $${targetBet}!`);
-        } else if (action === 'loan') {
-            sfx.chip();
-            p.bank += 100;
-            msg(`${p.name} took a $100 loan.`);
-            broadcastGameState(`${p.name} took a loan.`);
-            return;
+        }
+
+        // No more loans: once a player's bank hits zero, they're out of
+        // action for the rest of this deck.
+        if (p.bank <= 0) {
+            p.bank = 0;
+            p.isOut = true;
         }
 
         advanceHostTurn();
@@ -946,14 +1430,18 @@
             return;
         }
 
-        let roundOver = activePlayers.every(p => p.hasActed && p.currentBet === gameState.currentHighestBet);
+        let roundOver = activePlayers.every(p => p.bank === 0 || (p.hasActed && p.currentBet === gameState.currentHighestBet));
 
         if (roundOver) {
             advanceHostPhase();
         } else {
+            let nextIndex = gameState.turnIndex;
+            let attempts = 0;
             do {
-                gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
-            } while (gameState.players[gameState.turnIndex].folded);
+                nextIndex = (nextIndex + 1) % gameState.players.length;
+                attempts++;
+            } while ((gameState.players[nextIndex].folded || gameState.players[nextIndex].bank === 0) && attempts <= gameState.players.length);
+            gameState.turnIndex = nextIndex;
             broadcastGameState();
         }
     }
@@ -1063,7 +1551,7 @@
             if (p.folded) classes += " folded";
             else if (i === gameState.turnIndex && gameState.state < 6) classes += " active";
             
-            let betText = p.currentBet > 0 ? `Bet: $${p.currentBet}` : (p.folded ? 'Folded' : 'Waiting');
+            let betText = p.currentBet > 0 ? `Bet: $${p.currentBet}` : (p.isOut ? 'Out of Money' : (p.folded ? 'Folded' : 'Waiting'));
             
             let miniCardsHtml = '';
             if (p.id !== myId) {
